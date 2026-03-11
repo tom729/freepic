@@ -1,17 +1,17 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema';
-import path from 'path';
 
-// Initialize SQLite database with absolute path
-const sqlite = new Database(path.join(process.cwd(), 'database', 'sqlite.db'));
-
-
-// Enable WAL mode for better performance
-sqlite.pragma('journal_mode = WAL');
+// PostgreSQL connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/freepic',
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 2000, // Return error after 2 seconds if connection not established
+});
 
 // Initialize Drizzle ORM with schema
-export const db = drizzle(sqlite, { schema });
+export const db = drizzle(pool, { schema });
 
 // Export schema for type inference
 export type DB = typeof db;
@@ -20,7 +20,9 @@ export { schema };
 // Connection helper for health checks
 export async function checkDatabaseConnection(): Promise<boolean> {
   try {
-    sqlite.prepare('SELECT 1').get();
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
     return true;
   } catch (error) {
     console.error('Database connection failed:', error);
@@ -30,5 +32,8 @@ export async function checkDatabaseConnection(): Promise<boolean> {
 
 // Graceful shutdown helper
 export async function closeDatabaseConnection(): Promise<void> {
-  sqlite.close();
+  await pool.end();
 }
+
+// Export pool for direct queries if needed
+export { pool };

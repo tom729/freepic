@@ -1,15 +1,15 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, index, timestamp, jsonb, boolean } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Users table
-export const users = sqliteTable(
+export const users = pgTable(
   'users',
   {
     id: text('id').primaryKey(), // UUID as text
     email: text('email', { length: 255 }).notNull().unique(),
     password: text('password', { length: 255 }), // 密码哈希，旧用户可能为空
-    isActive: integer('is_active', { mode: 'boolean' }).default(false).notNull(), // 邮箱激活状态
-    isAdmin: integer('is_admin', { mode: 'boolean' }).default(false).notNull(), // 管理员权限
+    isActive: boolean('is_active').default(false).notNull(), // 邮箱激活状态
+    isAdmin: boolean('is_admin').default(false).notNull(), // 管理员权限
     name: text('name', { length: 100 }),
     avatar: text('avatar'), // 头像URL
     bio: text('bio'), // 个人简介
@@ -17,8 +17,8 @@ export const users = sqliteTable(
     website: text('website', { length: 255 }), // 个人网站
     instagram: text('instagram', { length: 100 }), // Instagram账号
     twitter: text('twitter', { length: 100 }), // Twitter/X账号
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
   (table) => ({
     emailIdx: index('users_email_idx').on(table.email),
@@ -26,7 +26,7 @@ export const users = sqliteTable(
 );
 
 // Images table
-export const images = sqliteTable(
+export const images = pgTable(
   'images',
   {
     id: text('id').primaryKey(), // UUID as text
@@ -34,10 +34,12 @@ export const images = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     cosKey: text('cos_key').notNull(),
-    exifData: text('exif_data', { mode: 'json' }), // JSON stored as text
+    exifData: jsonb('exif_data'), // JSONB for better performance
     description: text('description'), // User-provided image description
     location: text('location'), // GPS location name (e.g., "Shanghai, China")
-    status: text('status', { enum: ['pending', 'approved', 'rejected'] }).default('pending'),
+    status: text('status', { enum: ['pending', 'approved', 'rejected'] })
+      .default('pending')
+      .notNull(),
     width: integer('width'),
     height: integer('height'),
     fileSize: integer('file_size'),
@@ -47,8 +49,8 @@ export const images = sqliteTable(
     // Progressive loading fields (Unsplash-style)
     blurHash: text('blur_hash'), // BlurHash string for progressive loading
     dominantColor: text('dominant_color'), // Hex color for instant placeholder
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
   (table) => ({
     userIdIdx: index('images_user_id_idx').on(table.userId),
@@ -59,7 +61,7 @@ export const images = sqliteTable(
 );
 
 // Downloads table
-export const downloads = sqliteTable(
+export const downloads = pgTable(
   'downloads',
   {
     id: text('id').primaryKey(), // UUID as text
@@ -70,7 +72,7 @@ export const downloads = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     size: text('size', { enum: ['thumb', 'small', 'regular', 'large', 'full', 'original'] }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     imageIdIdx: index('downloads_image_id_idx').on(table.imageId),
@@ -80,15 +82,15 @@ export const downloads = sqliteTable(
 );
 
 // Image embeddings table for semantic search
-export const imageEmbeddings = sqliteTable(
+export const imageEmbeddings = pgTable(
   'image_embeddings',
   {
     id: text('id').primaryKey(),
     imageId: text('image_id')
       .notNull()
       .references(() => images.id, { onDelete: 'cascade' }),
-    embedding: text('embedding').notNull(), // JSON serialized 512-dim vector
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    embedding: jsonb('embedding').notNull(), // JSONB serialized vector
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     imageIdIdx: index('embeddings_image_id_idx').on(table.imageId),
@@ -143,7 +145,7 @@ export type ImageEmbedding = typeof imageEmbeddings.$inferSelect;
 export type NewImageEmbedding = typeof imageEmbeddings.$inferInsert;
 
 // Activation tokens table
-export const activationTokens = sqliteTable(
+export const activationTokens = pgTable(
   'activation_tokens',
   {
     id: text('id').primaryKey(),
@@ -151,9 +153,9 @@ export const activationTokens = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     token: text('token').notNull().unique(),
-    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-    usedAt: integer('used_at', { mode: 'timestamp' }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     userIdIdx: index('activation_tokens_user_id_idx').on(table.userId),
