@@ -2,9 +2,11 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { collections, users, images } from '@/lib/schema';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { collections, images } from '@/lib/schema';
+import { eq, desc, and } from 'drizzle-orm';
+import { verifyAuthWithUser } from '@/lib/server-auth';
 import { getImageUrl } from '@/lib/cos';
+import { randomUUID } from 'crypto';
 
 // Mock image URLs mapping
 const mockImageUrls: Record<string, string> = {
@@ -21,17 +23,14 @@ const mockImageUrls: Record<string, string> = {
 async function getCoverImageUrl(cosKey: string | null): Promise<string | null> {
   if (!cosKey) return null;
 
-  // Check if it's a mock image
   if (mockImageUrls[cosKey]) {
     return `${mockImageUrls[cosKey]}?w=600`;
   }
 
-  // Check if it's a local upload
   if (cosKey.startsWith('uploads/')) {
     return `/${cosKey}`;
   }
 
-  // Otherwise, it's a COS image
   try {
     return await getImageUrl(cosKey, { size: 'small', expires: 86400 });
   } catch (error) {
@@ -40,46 +39,29 @@ async function getCoverImageUrl(cosKey: string | null): Promise<string | null> {
   }
 }
 
-// GET /api/collections - List public collections
+// GET /api/users/me/collections - List current user's collections
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyAuthWithUser(request);
+
+    if (!auth.isAuthenticated || !auth.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
-    // Build conditions: only public collections
-    const conditions = [eq(collections.isPublic, true)];
+    // Get user's collections (both public and private)
+    const collectionsList = await db.query.collections.findMany({
+      where: eq(collections.userId, auth.userId),
+      orderBy: desc(collections.createdAt),
+      limit,
+      offset,
+    });
 
-    // Get total count
-    const countResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(collections)
-      .where(and(...conditions));
-    const total = countResult[0]?.count || 0;
-
-    // Get collections with user info
-    const collectionsList = await db
-      .select({
-        id: collections.id,
-        name: collections.name,
-        description: collections.description,
-        coverImageId: collections.coverImageId,
-        isPublic: collections.isPublic,
-        imageCount: collections.imageCount,
-        createdAt: collections.createdAt,
-        userId: collections.userId,
-        userName: users.name,
-        userEmail: users.email,
-      })
-      .from(collections)
-      .leftJoin(users, eq(collections.userId, users.id))
-      .where(and(...conditions))
-      .orderBy(desc(collections.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    // Get cover images
+    // Format with cover images
     const formattedCollections = await Promise.all(
       collectionsList.map(async (collection) => {
         let coverImageUrl: string | null = null;
@@ -94,10 +76,6 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        const userName =
-          collection.userName ||
-          (collection.userEmail ? collection.userEmail.split('@')[0] : 'Unknown');
-
         return {
           id: collection.id,
           name: collection.name,
@@ -106,25 +84,81 @@ export async function GET(request: NextRequest) {
           imageCount: collection.imageCount || 0,
           isPublic: collection.isPublic,
           createdAt: collection.createdAt?.toISOString(),
-          user: {
-            id: collection.userId,
-            name: userName,
-          },
+          updatedAt: collection.updatedAt?.toISOString(),
         };
       })
     );
 
     return NextResponse.json({
       collections: formattedCollections,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
     });
   } catch (error) {
-    console.error('Failed to fetch collections:', error);
+    console.error('Failed to fetch user collections:', error);
     return NextResponse.json({ error: 'Failed to fetch collections' }, { status: 500 });
+  }
+}
+
+// POST /api/users/me/collections - Create new collection
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await verifyAuthWithUser(request);
+
+    if (!auth.isAuthenticated || !auth.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { name, description, isPublic = true } = body;
+
+    // Validate input
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return NextResponse.json({ error: 'Collection name is required' }, { status: 400 });
+    }
+
+    if (name.length > 100) {
+      return NextResponse.json(
+        { error: 'Collection name must be 100 characters or less' },
+        { status: 400 }
+      );
+    }
+
+    if (description && description.length > 500) {
+      return NextResponse.json(
+        { error: 'Description must be 500 characters or less' },
+        { status: 400 }
+      );
+    }
+
+    // Create collection
+    const newCollection = await db
+      .insert(collections)
+      .values({
+        id: randomUUID(),
+        userId: auth.userId,
+        name: name.trim(),
+        description: description?.trim() || null,
+        isPublic: Boolean(isPublic),
+        imageCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    return NextResponse.json(
+      {
+        collection: {
+          id: newCollection[0].id,
+          name: newCollection[0].name,
+          description: newCollection[0].description,
+          imageCount: 0,
+          isPublic: newCollection[0].isPublic,
+          createdAt: newCollection[0].createdAt?.toISOString(),
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error('Failed to create collection:', error);
+    return NextResponse.json({ error: 'Failed to create collection' }, { status: 500 });
   }
 }

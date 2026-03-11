@@ -367,5 +367,7 @@ export default async function ImagePage({ params }: ImagePageProps) {
       </div>
     </>
   );
+)
 }
+
 }
