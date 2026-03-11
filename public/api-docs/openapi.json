@@ -1,0 +1,393 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "FreePic API",
+    "description": "FreePic copyright-free image sharing platform API for AI agents and developers",
+    "version": "1.0.0",
+    "contact": {
+      "name": "FreePic Dev Team",
+      "email": "dev@freepic.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:9000",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.freepic.com",
+      "description": "Production server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Images",
+      "description": "Image discovery and download"
+    },
+    {
+      "name": "Search",
+      "description": "Image search capabilities"
+    },
+    {
+      "name": "Users",
+      "description": "User profile information"
+    },
+    {
+      "name": "System",
+      "description": "System endpoints for discovery"
+    }
+  ],
+  "paths": {
+    "/api/images": {
+      "get": {
+        "summary": "List images",
+        "description": "Get a paginated list of approved images with optional filters",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "default": 1 },
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 20 },
+            "description": "Items per page (max 100)"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Search query (searches in camera info, description)"
+          },
+          {
+            "name": "camera",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by camera model"
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by user ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of images",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "images": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Image" }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/{id}": {
+      "get": {
+        "summary": "Get image details",
+        "description": "Get detailed information about a specific image",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Image UUID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Image" }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          }
+        }
+      }
+    },
+
+    "/api/search": {
+      "get": {
+        "summary": "Keyword search",
+        "description": "Search images by keywords (searches camera, description, user info)",
+        "tags": ["Search"],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Search query"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "images": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Image" }
+                    },
+                    "query": { "type": "string" },
+                    "pagination": { "$ref": "#/components/schemas/Pagination" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/search/semantic": {
+      "post": {
+        "summary": "Semantic search",
+        "description": "Natural language image search using CLIP embeddings. Describe what you want to see.",
+        "tags": ["Search"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Natural language description of desired image"
+                  }
+                },
+                "required": ["query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Semantic search results with similarity scores",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "images": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          { "$ref": "#/components/schemas/Image" },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "similarity": { "type": "number" }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/search/visual": {
+      "post": {
+        "summary": "Visual search",
+        "description": "Find similar images by uploading an image file",
+        "tags": ["Search"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to search for (JPEG/PNG, max 10MB)"
+                  }
+                },
+                "required": ["image"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Similar images found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "images": { "type": "array" },
+                    "total": { "type": "integer" },
+                    "threshold": { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/users/{id}": {
+      "get": {
+        "summary": "Get user profile",
+        "description": "Get public profile information for a user",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "User UUID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/tags": {
+      "get": {
+        "summary": "List available tags",
+        "description": "Get list of available camera models and tags for filtering",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Tags list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cameras": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/sitemap.xml": {
+      "get": {
+        "summary": "XML Sitemap",
+        "description": "Get XML sitemap for search engine discovery",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "XML sitemap",
+            "content": {
+              "application/xml": {}
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "schemas": {
+      "Image": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Image UUID" },
+          "url": { "type": "string", "description": "Original image URL" },
+          "thumbnailUrl": { "type": "string", "description": "400px thumbnail URL" },
+          "smallUrl": { "type": "string", "description": "400px small version URL" },
+          "regularUrl": { "type": "string", "description": "1080px regular version URL" },
+          "fullUrl": { "type": "string", "description": "1920px full version URL" },
+          "width": { "type": "integer", "description": "Image width in pixels" },
+          "height": { "type": "integer", "description": "Image height in pixels" },
+          "author": { "type": "string", "description": "Display name of photographer" },
+          "userId": { "type": "string", "description": "UUID of the photographer" },
+          "camera": { "type": "string", "description": "Camera model used" },
+          "likes": { "type": "integer" },
+          "downloads": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "blurHash": { "type": "string", "description": "Blur placeholder hash" },
+          "dominantColor": { "type": "string", "description": "Hex color code" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "avatar": { "type": "string" },
+          "bio": { "type": "string" },
+          "location": { "type": "string" },
+          "website": { "type": "string" },
+          "instagram": { "type": "string" },
+          "twitter": { "type": "string" }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer" },
+          "limit": { "type": "integer" },
+          "total": { "type": "integer" },
+          "totalPages": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

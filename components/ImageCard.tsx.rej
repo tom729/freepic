@@ -1,0 +1,10 @@
+***************
+*** 5
+- import { Heart, Camera, User, Trash2, Loader2 } from 'lucide-react';
+--- 5 -----
++ import { Heart, Camera, User } from 'lucide-react';
+***************
+*** 29
+- export function ImageCard({ image, onClick, priority = false }: ImageCardProps) {
+--- 31 -----
++ export function ImageCard({ image, onClick, onDelete, priority = false }: ImageCardProps) {

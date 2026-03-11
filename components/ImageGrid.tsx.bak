@@ -1,0 +1,192 @@
+'use client';
+
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Masonry from 'react-masonry-css';
+import { ImageCard, ImageItem } from './ImageCard';
+import { Loader2 } from 'lucide-react';
+
+const breakpointColumns = {
+  default: 3,
+  1280: 3,
+  1024: 2,
+  768: 2,
+  640: 1,
+};
+
+interface ApiImage {
+  id: string;
+  cosKey: string;
+  thumbnailUrl: string;
+  originalUrl: string;
+  width: number;
+  height: number;
+  author: string;
+  userId?: string;
+  camera?: string;
+  likes: number;
+  downloads: number;
+  createdAt: string;
+}
+
+interface ApiResponse {
+  images: ApiImage[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+interface ImageGridProps {
+  apiUrl?: string;
+  title?: string;
+  showLoadMore?: boolean;
+  limit?: number;
+  excludeImageId?: string;
+}
+
+export function ImageGrid({
+  apiUrl = '/api/images',
+  title,
+  showLoadMore = true,
+  limit = 20,
+  excludeImageId,
+}: ImageGridProps) {
+  const router = useRouter();
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadMore = useCallback(async () => {
+    if (isLoading || !hasMore) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const url = new URL(apiUrl, window.location.origin);
+      url.searchParams.set('page', page.toString());
+      url.searchParams.set('limit', limit.toString());
+
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch: ' + response.status);
+      }
+
+      const data: ApiResponse = await response.json();
+
+      if (data.images.length === 0) {
+        setHasMore(false);
+      } else {
+        // Filter out excluded image if specified
+        let newImages = data.images;
+        if (excludeImageId) {
+          newImages = newImages.filter((img) => img.id !== excludeImageId);
+        }
+
+        const formattedImages: ImageItem[] = newImages.map((img) => ({
+          id: img.id,
+          url: img.originalUrl,
+          thumbnailUrl: img.thumbnailUrl,
+          width: img.width,
+          height: img.height,
+          author: img.author,
+          userId: img.userId,
+          camera: img.camera || undefined,
+          likes: img.likes,
+        }));
+
+        setImages((prev) => [...prev, ...formattedImages]);
+        setPage((prev) => prev + 1);
+
+        if (page >= data.pagination.totalPages) {
+          setHasMore(false);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load images:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load images');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, hasMore, page, apiUrl, limit, excludeImageId]);
+
+  // Initial load
+  useEffect(() => {
+    loadMore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleImageClick = (image: ImageItem) => {
+    router.push(`/image/${image.id}`);
+  };
+
+  return (
+    <div className="w-full">
+      {title && <h2 className="text-xl font-semibold text-gray-900 mb-4">{title}</h2>}
+
+      {error && (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 text-center text-red-600">
+          <p className="font-medium">加载失败</p>
+          <p className="text-sm">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              loadMore();
+            }}
+            className="mt-2 text-sm font-medium text-red-700 hover:underline"
+          >
+            重试
+          </button>
+        </div>
+      )}
+
+      {!isLoading && images.length === 0 && !error && (
+        <div className="py-12 text-center">
+          <p className="text-gray-500">暂无相关图片</p>
+        </div>
+      )}
+
+      {images.length > 0 && (
+        <Masonry
+          breakpointCols={breakpointColumns}
+          className="flex w-auto -ml-4"
+          columnClassName="pl-4 bg-clip-padding"
+        >
+          {images.map((image, index) => (
+            <ImageCard
+              key={image.id}
+              image={image}
+              onClick={() => handleImageClick(image)}
+            />
+          ))}
+        </Masonry>
+      )}
+
+      {showLoadMore && (
+        <div className="flex items-center justify-center py-8">
+          {isLoading ? (
+            <div className="flex flex-col items-center gap-3 text-neutral-500">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="text-sm">加载中...</span>
+            </div>
+          ) : hasMore ? (
+            <button
+              onClick={loadMore}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              加载更多
+            </button>
+          ) : (
+            <span className="text-sm text-neutral-400">没有更多图片了</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

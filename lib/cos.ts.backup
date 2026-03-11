@@ -1,0 +1,615 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import COS from 'cos-nodejs-sdk-v5';
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Image size variants for thumbnail generation
+ */
+/**
+ * Image size variants following Unsplash's naming convention
+ */
+export type ImageSize = 'thumb' | 'small' | 'regular' | 'full' | 'original';
+
+/**
+ * Image variant info
+ */
+export interface ImageVariant {
+  url: string;
+  width: number;
+  height?: number;
+}
+
+/**
+ * Image processing options for COS CI (Cloud Infinite)
+ */
+export interface ImageProcessingOptions {
+  /** Target width in pixels */
+  width?: number;
+  /** Target height in pixels */
+  height?: number;
+  /** Output format: webp, jpg, png, avif */
+  format?: 'webp' | 'jpg' | 'png' | 'avif';
+  /** Quality 0-100 (default: 85) */
+  quality?: number;
+  /** Progressive JPEG/WebP (default: true) */
+  progressive?: boolean;
+  /** Fit mode: crop, clip, max, scale */
+  fit?: 'crop' | 'clip' | 'max' | 'scale';
+  /** Gravity for cropping: center, north, east, south, west, faces */
+  gravity?: 'center' | 'north' | 'east' | 'south' | 'west' | 'faces';
+}
+
+/**
+ * Result of a successful image upload
+ */
+export interface UploadResult {
+  key: string;
+  url: string;
+  etag: string;
+}
+
+/**
+ * Options for generating signed URLs
+ */
+export interface SignedUrlOptions {
+  /** URL expiration time in seconds (default: 3600 = 1 hour) */
+  expires?: number;
+  /** Image size variant (legacy, prefer processingOptions) */
+  size?: ImageSize;
+  /** Image processing options for COS CI */
+  processingOptions?: ImageProcessingOptions;
+}
+
+
+/**
+ * COS configuration from environment variables
+ */
+interface CosConfig {
+  secretId: string;
+  secretKey: string;
+  region: string;
+  bucket: string;
+}
+
+/**
+ * Custom error class for COS operations
+ */
+export class CosError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly originalError?: Error
+  ) {
+    super(message);
+    this.name = 'CosError';
+  }
+}
+
+/**
+ * Check if we're in build/SSG phase
+ */
+function isBuildPhase(): boolean {
+  return process.env.NODE_ENV === 'production' && !process.env.TENCENT_COS_SECRET_ID;
+}
+
+/**
+ * Get COS configuration from environment variables
+ * @throws {CosError} If required environment variables are missing (only at runtime)
+ */
+function getCosConfig(): CosConfig {
+  const secretId = process.env.TENCENT_COS_SECRET_ID;
+  const secretKey = process.env.TENCENT_COS_SECRET_KEY;
+  const region = process.env.TENCENT_COS_REGION;
+  const bucket = process.env.TENCENT_COS_BUCKET;
+
+  // During build phase, return mock config to allow SSG
+  if (isBuildPhase()) {
+    return {
+      secretId: 'build-phase-mock-secret-id',
+      secretKey: 'build-phase-mock-secret-key',
+      region: 'ap-beijing',
+      bucket: 'build-phase-mock-bucket',
+    };
+  }
+
+  if (!secretId) {
+    throw new CosError(
+      'Missing TENCENT_COS_SECRET_ID environment variable',
+      'MISSING_SECRET_ID'
+    );
+  }
+  if (!secretKey) {
+    throw new CosError(
+      'Missing TENCENT_COS_SECRET_KEY environment variable',
+      'MISSING_SECRET_KEY'
+    );
+  }
+  if (!region) {
+    throw new CosError(
+      'Missing TENCENT_COS_REGION environment variable',
+      'MISSING_REGION'
+    );
+  }
+  if (!bucket) {
+    throw new CosError(
+      'Missing TENCENT_COS_BUCKET environment variable',
+      'MISSING_BUCKET'
+    );
+  }
+
+  return { secretId, secretKey, region, bucket };
+}
+
+/**
+ * Create and configure COS client instance
+ * @returns Configured COS client
+ * @throws {CosError} If configuration is invalid
+ */
+export function createCosClient(): COS {
+  const config = getCosConfig();
+
+  return new COS({
+    SecretId: config.secretId,
+    SecretKey: config.secretKey,
+  });
+}
+
+
+/**
+ * Generate a unique key for uploaded image with hierarchical structure
+ * Format: users/{userId}/{year}/{month}/{filename}
+ * @param userId - User ID for organizing files by user
+ * @param originalFilename - Original filename to preserve extension
+ * @returns Hierarchical key path
+ */
+export function generateImageKey(userId: string, originalFilename: string): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const extension = originalFilename.split('.').pop()?.toLowerCase() || 'jpg';
+  const sanitizedName = originalFilename
+    .replace(/[^a-zA-Z0-9.-]/g, '-')
+    .substring(0, 50)
+    .replace(/\.[^/.]+$/, ''); // Remove extension to avoid duplication
+  
+  return `users/${userId}/${year}/${month}/${sanitizedName}.${extension}`;
+}
+
+
+/**
+ * Map size variant to width (Unsplash-style)
+ */
+const SIZE_WIDTHS: Record<ImageSize, number> = {
+  thumb: 200,
+  small: 400,
+  regular: 1080,
+  full: 2048,
+  original: 0, // No resizing
+};
+
+/**
+ * Generate COS image processing URL suffix for thumbnail
+ * @param size - Desired image size variant
+ * @returns COS image processing query string
+ * @deprecated Use generateProcessingUrl instead
+ */
+export function generateThumbnailUrl(size: ImageSize): string {
+  if (size === 'original') {
+    return '';
+  }
+
+  const width = SIZE_WIDTHS[size] || 800;
+  // COS imageMogr2 format: ?imageMogr2/thumbnail/!<width>x
+  return `?imageMogr2/thumbnail/!${width}x`;
+}
+
+/**
+ * Generate COS CI (Cloud Infinite) image processing URL
+ * Follows Unsplash-style image delivery with real-time transformations
+ * 
+ * @param baseUrl - Base signed URL or key
+ * @param options - Processing options
+ * @returns URL with processing parameters
+ * 
+ * @example
+ * generateProcessingUrl('https://bucket.cos.region.myqcloud.com/photo.jpg', {
+ *   width: 1080,
+ *   format: 'webp',
+ *   quality: 85,
+ *   fit: 'max'
+ * })
+ * // Returns: https://.../photo.jpg?imageMogr2/thumbnail/!1080x/format/webp/quality/85
+ */
+export function generateProcessingUrl(
+  baseUrl: string,
+  options: ImageProcessingOptions
+): string {
+  const params: string[] = [];
+
+  // Size/Resize - using !<width>x to limit max dimension while keeping aspect ratio
+  if (options.width && options.height) {
+    // Exact dimensions with crop
+    params.push(`thumbnail/!${options.width}x${options.height}r`);
+  } else if (options.width) {
+    // Max width, auto height
+    params.push(`thumbnail/!${options.width}x`);
+  } else if (options.height) {
+    // Max height, auto width
+    params.push(`thumbnail/x${options.height}`);
+  }
+
+  // Format conversion
+  if (options.format) {
+    params.push(`format/${options.format}`);
+  }
+
+  // Quality (1-100)
+  if (options.quality !== undefined) {
+    params.push(`quality/${options.quality}`);
+  }
+
+  // Progressive JPEG
+  if (options.progressive !== false) {
+    params.push('interlace/1');
+  }
+
+  // Fit mode (crop strategy)
+  if (options.fit) {
+    const fitMap: Record<string, string> = {
+      crop: 'cut',
+      clip: 'clip',
+      max: 'max',
+      scale: 'scale',
+    };
+    if (fitMap[options.fit]) {
+      params.push(`scrop/${fitMap[options.fit]}`);
+    }
+  }
+
+  // Gravity (crop anchor point)
+  if (options.gravity) {
+    const gravityMap: Record<string, string> = {
+      center: 'center',
+      north: 'north',
+      east: 'east',
+      south: 'south',
+      west: 'west',
+      faces: 'faces', // Face detection
+    };
+    if (gravityMap[options.gravity]) {
+      params.push(`gravity/${gravityMap[options.gravity]}`);
+    }
+  }
+
+  if (params.length === 0) {
+    return baseUrl;
+  }
+
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}imageMogr2/${params.join('/')}`;
+}
+
+/**
+ * Generate all image variants (Unsplash-style)
+ * Creates URLs for all standard sizes
+ * 
+ * @param key - COS object key
+ * @param originalWidth - Original image width
+ * @param originalHeight - Original image height
+ * @returns Object with variant URLs
+ */
+export async function generateImageVariants(
+  key: string,
+  originalWidth: number,
+  originalHeight: number
+): Promise<Record<ImageSize, ImageVariant>> {
+  const baseUrl = await getImageUrl(key, { expires: 86400 * 7 }); // 7 days
+
+  const variants: Record<ImageSize, ImageVariant> = {
+    original: {
+      url: baseUrl,
+      width: originalWidth,
+      height: originalHeight,
+    },
+    full: {
+      url: generateProcessingUrl(baseUrl, {
+        width: Math.min(2048, originalWidth),
+        quality: 90,
+        format: 'webp',
+        progressive: true,
+      }),
+      width: Math.min(2048, originalWidth),
+      height: Math.round(originalHeight * (Math.min(2048, originalWidth) / originalWidth)),
+    },
+    regular: {
+      url: generateProcessingUrl(baseUrl, {
+        width: Math.min(1080, originalWidth),
+        quality: 85,
+        format: 'webp',
+        progressive: true,
+      }),
+      width: Math.min(1080, originalWidth),
+      height: Math.round(originalHeight * (Math.min(1080, originalWidth) / originalWidth)),
+    },
+    small: {
+      url: generateProcessingUrl(baseUrl, {
+        width: Math.min(400, originalWidth),
+        quality: 80,
+        format: 'webp',
+        progressive: true,
+      }),
+      width: Math.min(400, originalWidth),
+      height: Math.round(originalHeight * (Math.min(400, originalWidth) / originalWidth)),
+    },
+    thumb: {
+      url: generateProcessingUrl(baseUrl, {
+        width: Math.min(200, originalWidth),
+        quality: 75,
+        format: 'webp',
+        progressive: true,
+      }),
+      width: Math.min(200, originalWidth),
+      height: Math.round(originalHeight * (Math.min(200, originalWidth) / originalWidth)),
+    },
+  };
+
+  return variants;
+}
+
+/**
+ * Upload an image buffer to COS
+
+
+/**
+ * Upload an image buffer to COS with hierarchical storage structure
+ * Format: users/{userId}/{year}/{month}/{filename}
+ * @param userId - User ID for organizing files by user
+ * @param buffer - Image data as Buffer
+ * @param originalFilename - Original filename for extension/key generation
+ * @param contentType - MIME type of the image (e.g., 'image/jpeg')
+ * @returns Upload result with key, URL, and ETag
+ * @throws {CosError} If upload fails
+ */
+ /**
+
+  try {
+    const result = await client.putObject({
+      Bucket: config.bucket,
+      Region: config.region,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      // Private access - requires signed URL
+      ACL: 'private',
+    });
+
+    // Generate a signed URL for immediate access
+    const url = await getImageUrl(key);
+
+    return {
+      key,
+      url,
+      etag: result.ETag || '',
+    };
+  } catch (error) {
+    const err = error as Error;
+    throw new CosError(
+      `Failed to upload image: ${err.message}`,
+      'UPLOAD_FAILED',
+      err
+    );
+  }
+}
+
+/**
+ * Generate a signed URL for accessing an image
+ * @param key - COS object key
+ * @param options - Options for URL generation (expires, size)
+ * @returns Signed URL string
+ * @throws {CosError} If URL generation fails
+ */
+export async function getImageUrl(
+  key: string,
+  options: SignedUrlOptions = {}
+): Promise<string> {
+  const client = createCosClient();
+  const config = getCosConfig();
+  const { expires = 3600, size = 'original', processingOptions } = options;
+
+  try {
+    // Get base signed URL
+    const url = client.getObjectUrl({
+      Bucket: config.bucket,
+      Region: config.region,
+      Key: key,
+      Expires: expires,
+      Sign: true,
+    });
+
+    // Apply processing options if provided (new way)
+    if (processingOptions) {
+      return generateProcessingUrl(url, processingOptions);
+    }
+
+    // Legacy size-based URL generation (backward compatibility)
+    const thumbnailSuffix = generateThumbnailUrl(size);
+    if (thumbnailSuffix) {
+      return `${url}${thumbnailSuffix}`;
+    }
+
+    return url;
+  } catch (error) {
+    const err = error as Error;
+    throw new CosError(
+      `Failed to generate signed URL: ${err.message}`,
+      'URL_GENERATION_FAILED',
+      err
+    );
+  }
+}
+
+
+/**
+ * Delete an image from COS by its key
+ * @param key - COS object key to delete
+ * @throws {CosError} If deletion fails
+ */
+export async function deleteImage(key: string): Promise<void> {
+  const client = createCosClient();
+  const config = getCosConfig();
+
+  try {
+    await client.deleteObject({
+      Bucket: config.bucket,
+      Region: config.region,
+      Key: key,
+    });
+  } catch (error) {
+    const err = error as Error;
+    throw new CosError(
+      `Failed to delete image: ${err.message}`,
+      'DELETE_FAILED',
+      err
+    );
+  }
+}
+
+/**
+ * Batch delete multiple images from COS
+ * @param keys - Array of COS object keys to delete
+ * @returns Object with deleted keys and any errors
+ */
+export async function deleteImagesBatch(
+  keys: string[]
+): Promise<{ deleted: string[]; errors: Array<{ key: string; error: CosError }> }> {
+  const client = createCosClient();
+  const config = getCosConfig();
+  const deleted: string[] = [];
+  const errors: Array<{ key: string; error: CosError }> = [];
+
+  // Process in batches of 1000 (COS limit)
+  const batchSize = 1000;
+  for (let i = 0; i < keys.length; i += batchSize) {
+    const batch = keys.slice(i, i + batchSize);
+
+    try {
+      const result = await client.deleteMultipleObject({
+        Bucket: config.bucket,
+        Region: config.region,
+        Objects: batch.map((key) => ({ Key: key })),
+      });
+
+      // Track deleted and failed
+      if (result.Deleted) {
+        result.Deleted.forEach((item) => {
+          if (item.Key) deleted.push(item.Key);
+        });
+      }
+
+      if (result.Error) {
+        result.Error.forEach((item) => {
+          if (item.Key) {
+            errors.push({
+              key: item.Key,
+              error: new CosError(
+                item.Message || 'Unknown error',
+                item.Code || 'BATCH_DELETE_ERROR'
+              ),
+            });
+          }
+        });
+      }
+    } catch (error) {
+      const err = error as Error;
+      // If batch fails entirely, mark all as failed
+      batch.forEach((key) => {
+        errors.push({
+          key,
+          error: new CosError(
+            `Batch delete failed: ${err.message}`,
+            'BATCH_DELETE_FAILED',
+            err
+          ),
+        });
+      });
+    }
+  }
+
+  return { deleted, errors };
+}
+
+/**
+ * Check if an image exists in COS
+ * @param key - COS object key to check
+ * @returns Boolean indicating if object exists
+ * @throws {CosError} If check fails (other than 404)
+ */
+export async function imageExists(key: string): Promise<boolean> {
+  const client = createCosClient();
+  const config = getCosConfig();
+
+  try {
+    await client.headObject({
+      Bucket: config.bucket,
+      Region: config.region,
+      Key: key,
+    });
+    return true;
+  } catch (error) {
+    const err = error as { statusCode?: number; message?: string };
+    if (err.statusCode === 404) {
+      return false;
+    }
+    throw new CosError(
+      `Failed to check image existence: ${err.message}`,
+      'HEAD_FAILED',
+      err as Error
+    );
+  }
+}
+
+/**
+ * Get image metadata from COS
+ * @param key - COS object key
+ * @returns Object metadata including Content-Type, Content-Length, ETag, Last-Modified
+ * @throws {CosError} If retrieval fails
+ */
+export async function getImageMetadata(
+  key: string
+): Promise<{
+  contentType: string;
+  contentLength: number;
+  etag: string;
+  lastModified: string;
+}> {
+  const client = createCosClient();
+  const config = getCosConfig();
+
+  try {
+    const result = await client.headObject({
+      Bucket: config.bucket,
+      Region: config.region,
+      Key: key,
+    });
+
+    return {
+      contentType: (result.headers?.['content-type'] as string) || 'unknown',
+      contentLength: parseInt(
+        (result.headers?.['content-length'] as string) || '0',
+        10
+      ),
+      etag: (result.headers?.etag as string) || '',
+      lastModified: (result.headers?.['last-modified'] as string) || '',
+    };
+  } catch (error) {
+    const err = error as Error;
+    throw new CosError(
+      `Failed to get image metadata: ${err.message}`,
+      'METADATA_FAILED',
+      err
+    );
+  }
+}
+
+// Export a singleton client for convenience
+export const cosClient = createCosClient();

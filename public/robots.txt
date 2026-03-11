@@ -1,0 +1,106 @@
+# robots.txt - FreePic AI Agent and Crawler Guidelines
+# Last updated: 2024
+
+# ============================================
+# General Rules for All Crawlers
+# ============================================
+User-agent: *
+
+# Allow main content pages
+Allow: /
+Allow: /search
+Allow: /search/*
+Allow: /image/
+Allow: /image/*
+Allow: /user/
+Allow: /user/*
+Allow: /about
+Allow: /upload
+
+# Allow public API endpoints (read-only)
+Allow: /api/images
+Allow: /api/images/*
+Allow: /api/tags
+Allow: /api/search/*
+Allow: /api/users/*
+
+# Disallow private/admin areas
+Disallow: /api/admin/
+Disallow: /api/auth/
+Disallow: /api/users/me
+Disallow: /admin/
+Disallow: /login
+Disallow: /register
+Disallow: /profile
+
+# Disallow non-essential paths
+Disallow: /*?*sort=
+Disallow: /*?*filter=
+Disallow: /_next/
+Disallow: /static/
+
+# Crawl-delay to be nice to our servers
+Crawl-delay: 1
+
+# ============================================
+# AI-Specific Agents
+# ============================================
+
+# OpenAI GPTBot - Training data crawler
+User-agent: GPTBot
+Allow: /
+Allow: /search
+Allow: /image/
+Allow: /user/
+Allow: /about
+Disallow: /api/
+Disallow: /admin/
+
+# Claude (Anthropic) - Training data crawler  
+User-agent: Claude-Web
+User-agent: ClaudeBot
+Allow: /
+Allow: /search
+Allow: /image/
+Allow: /user/
+Allow: /about
+Disallow: /api/
+Disallow: /admin/
+
+# Google Bard/Gemini
+User-agent: Google-Extended
+Allow: /
+Allow: /search
+Allow: /image/
+Allow: /user/
+Allow: /about
+Disallow: /api/
+Disallow: /admin/
+
+# Bing Copilot
+User-agent: BingPreview
+User-agent: MicrosoftPreview
+Allow: /
+Allow: /search
+Allow: /image/
+Allow: /user/
+Allow: /about
+Disallow: /api/
+Disallow: /admin/
+
+# Common search engines (always allow)
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+User-agent: Baiduspider
+Allow: /
+Allow: /search
+Allow: /image/
+Allow: /user/
+Allow: /about
+
+# ============================================
+# Sitemap Location
+# ============================================
+Sitemap: http://localhost:9000/sitemap.xml

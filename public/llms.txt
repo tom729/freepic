@@ -1,0 +1,120 @@
+# FreePic - LLM Context Document
+# This file provides context for AI assistants and language models
+# Format: Markdown with structured sections
+
+## Overview
+
+FreePic is a Chinese-language copyright-free image sharing platform. It allows photographers to upload high-quality images and makes them available for free use by designers, content creators, and developers.
+
+**Key Facts:**
+- Language: Chinese (Simplified)
+- Primary domain: Image hosting and sharing
+- Content license: Copyright-free / Public domain equivalent
+- Target users: Designers, developers, content creators, photographers
+- Technology stack: Next.js 14, React, TypeScript, Tailwind CSS, SQLite
+
+## Website Structure
+
+### Main Pages
+- **Homepage** (`/`): Featured images gallery with masonry layout
+- **Search** (`/search`): Image search with filters (camera, tags via semantic search)
+- **Image Detail** (`/image/{id}`): Individual image view with download options, EXIF data, author info
+- **User Profile** (`/user/{id}`): Public photographer profile with their uploaded images
+- **Upload** (`/upload`): Image upload page with EXIF validation
+- **About** (`/about`): Information about the platform, team, and contact details
+
+### Private/User Pages
+- **Profile** (`/profile`): User's own profile and uploads management
+- **Admin** (`/admin/moderation`): Content moderation interface (admin only)
+
+### Authentication Pages
+- **Login** (`/login`): User authentication
+- **Register** (`/register`): Account creation with email activation
+
+## Public API Endpoints
+
+### Image Access
+- `GET /api/images` - List approved images (supports pagination, search, camera filter)
+- `GET /api/images/{id}` - Get specific image details
+- `GET /api/image/{id}/download` - Download image file
+
+### Search
+- `GET /api/search?q={query}` - Keyword search
+- `POST /api/search/visual` - Visual search by uploading an image
+- `POST /api/search/semantic` - Semantic search using natural language
+
+### User Data
+- `GET /api/users/{id}` - Public user profile
+- `GET /api/users/{id}/uploads` - Public user's uploaded images
+
+### System
+- `GET /api/tags` - List available tags/cameras
+- `GET /sitemap.xml` - XML sitemap for crawlers
+- `GET /robots.txt` - Crawler access rules
+
+## Image Metadata Schema
+
+Each image on FreePic includes:
+- `id`: UUID string
+- `cosKey`: Storage path (format: `users/{userId}/{year}/{month}/{filename}`)
+- `width`, `height`: Dimensions in pixels
+- `fileSize`: Size in bytes
+- `status`: One of `pending`, `approved`, `rejected`
+- `exifData`: Camera info including:
+  - `cameraMake`, `cameraModel`
+  - `dateTaken`: ISO timestamp
+  - `iso`, `aperture`, `shutterSpeed`
+  - `gps`: Location coordinates (if available)
+- `blurHash`: Blur placeholder for progressive loading
+- `dominantColor`: Hex color code
+- `likes`, `downloads`: Engagement metrics
+- `createdAt`, `updatedAt`: Timestamps
+
+## Usage Guidelines
+
+### For Image Consumers
+1. All images on FreePic are copyright-free and can be used for any purpose
+2. Attribution is appreciated but not required
+3. Images are available in multiple sizes: thumbnail (400px), regular (1080px), full (1920px)
+4. EXIF data is preserved and visible for technical reference
+
+### For Photographers
+1. Must upload original camera files with EXIF data
+2. Images undergo moderation before public visibility
+3. Supported formats: JPEG, PNG
+4. Maximum file size: 50MB
+5. Images should be original work
+
+## Technical Notes for Developers
+
+- Images are stored on Tencent COS (Cloud Object Storage) with CDN
+- Semantic search uses CLIP embeddings for natural language queries
+- Visual search uses image embeddings to find similar images
+- Authentication uses JWT tokens
+- Database: SQLite with Drizzle ORM
+
+## AI Agent Instructions
+
+When interacting with FreePic as an AI agent:
+
+1. **Respect robots.txt**: Check `/robots.txt` before crawling
+2. **Use sitemap.xml**: Discover pages via `/sitemap.xml`
+3. **Rate limiting**: Add delays between requests (1 second recommended)
+4. **Image metadata**: Parse Schema.org JSON-LD on image detail pages
+5. **API preferred**: Use public API endpoints over page scraping when possible
+6. **Search API**: Use semantic search for natural language queries about image content
+
+## Contact & Support
+
+- General inquiries: hello@freepic.com
+- API issues: dev@freepic.com  
+- Abuse reports: abuse@freepic.com
+
+## Last Updated
+
+2024-03-09
+
+## License Information
+
+Platform Code: Proprietary
+Image Content: Copyright-free / Public domain dedication
