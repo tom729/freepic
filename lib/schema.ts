@@ -111,6 +111,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   downloads: many(downloads),
   views: many(imageViews),
   collections: many(collections),
+  comments: many(comments),
+  commentLikes: many(commentLikes),
 }));
 
 export const imagesRelations = relations(images, ({ one, many }) => ({
@@ -127,6 +129,7 @@ export const imagesRelations = relations(images, ({ one, many }) => ({
   viewAggregates: many(imageViewAggregates),
   imageTags: many(imageTags),
   collectionImages: many(collectionImages),
+  comments: many(comments),
 }));
 
 export const downloadsRelations = relations(downloads, ({ one }) => ({
@@ -455,6 +458,7 @@ export const collectionsRelations = relations(collections, ({ one, many }) => ({
     references: [images.id],
   }),
   collectionImages: many(collectionImages),
+  comments: many(comments),
 }));
 
 // Relations for collectionImages
@@ -475,4 +479,88 @@ export const collectionImagesRelations = relations(collectionImages, ({ one }) =
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;
 export type CollectionImage = typeof collectionImages.$inferSelect;
-export type NewCollectionImage = typeof collectionImages.$inferInsert;
+export type NewCollectionImage = typeof collectionImages.$inferInsert;// Comments table for image comments with nested replies
+export const comments = pgTable(
+  'comments',
+  {
+    id: text('id').primaryKey(), // UUID as text
+    imageId: text('image_id')
+      .notNull()
+      .references(() => images.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    parentId: text('parent_id').references(() => comments.id, { onDelete: 'cascade' }), // For nested replies
+    content: text('content').notNull(),
+    status: text('status', { enum: ['pending', 'approved', 'rejected'] })
+      .default('pending')
+      .notNull(),
+    likes: integer('likes').default(0).notNull(),
+    isEdited: boolean('is_edited').default(false).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+  },
+  (table) => ({
+    imageIdIdx: index('comments_image_id_idx').on(table.imageId),
+    userIdIdx: index('comments_user_id_idx').on(table.userId),
+    parentIdIdx: index('comments_parent_id_idx').on(table.parentId),
+    statusIdx: index('comments_status_idx').on(table.status),
+    createdAtIdx: index('comments_created_at_idx').on(table.createdAt),
+  })
+);
+
+// Comment likes table for tracking user likes on comments
+export const commentLikes = pgTable(
+  'comment_likes',
+  {
+    id: text('id').primaryKey(), // UUID as text
+    commentId: text('comment_id')
+      .notNull()
+      .references(() => comments.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    commentIdIdx: index('comment_likes_comment_id_idx').on(table.commentId),
+    userIdIdx: index('comment_likes_user_id_idx').on(table.userId),
+    uniqueCommentLike: unique('comment_likes_unique_idx').on(table.commentId, table.userId),
+  })
+);
+
+// Relations for comments
+export const commentsRelations = relations(comments, ({ one, many }) => ({
+  image: one(images, {
+    fields: [comments.imageId],
+    references: [images.id],
+  }),
+  user: one(users, {
+    fields: [comments.userId],
+    references: [users.id],
+  }),
+  parent: one(comments, {
+    fields: [comments.parentId],
+    references: [comments.id],
+  }),
+  replies: many(comments),
+  commentLikes: many(commentLikes),
+}));
+
+// Relations for comment likes
+export const commentLikesRelations = relations(commentLikes, ({ one }) => ({
+  comment: one(comments, {
+    fields: [commentLikes.commentId],
+    references: [comments.id],
+  }),
+  user: one(users, {
+    fields: [commentLikes.userId],
+    references: [users.id],
+  }),
+}));
+
+// Type exports for Comments
+export type Comment = typeof comments.$inferSelect;
+export type NewComment = typeof comments.$inferInsert;
+export type CommentLike = typeof commentLikes.$inferSelect;
+export type NewCommentLike = typeof commentLikes.$inferInsert;
