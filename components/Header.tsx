@@ -1,9 +1,10 @@
 'use client';
+import { NotificationBell } from './NotificationBell';
 
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/auth';
-import { User, LogOut, Upload } from 'lucide-react';
+import { User, LogOut, Upload, Bell } from 'lucide-react';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -82,6 +83,10 @@ export function Header() {
             </svg>
           </Link>
 
+          {/* Notification Bell */}
+          <NotificationBell className="hidden md:flex" />
+
+
           {/* User Section */}
           {isAuthenticated && user ? (
             <div className="flex items-center gap-2">
@@ -152,6 +157,16 @@ export function Header() {
             <MobileNavLink href="/search" onClick={() => setIsMenuOpen(false)}>
               搜索
             </MobileNavLink>
+
+            {isAuthenticated && (
+              <MobileNavLink href="/profile?tab=notifications" onClick={() => setIsMenuOpen(false)}>
+                <span className="flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  Notifications
+                </span>
+              </MobileNavLink>
+            )}
+
 
             {isAuthenticated ? (
               <>

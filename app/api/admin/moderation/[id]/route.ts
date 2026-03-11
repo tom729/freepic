@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { images } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { verifyAuthWithUser } from '@/lib/server-auth';
+import { createNotification } from '@/lib/notifications';
 
 // 验证管理员权限
 async function verifyAdmin(request: NextRequest) {
@@ -80,6 +81,30 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         // 不阻塞审核流程，embedding 失败可以后续重试
       }
     }
+    // 发送通知给图片上传者（非阻塞）
+    try {
+      const notificationType = action === 'approve' ? 'image_approved' : 'image_rejected';
+      const title = action === 'approve' 
+        ? 'Your image has been approved'
+        : 'Your image has been rejected';
+      const content = action === 'approve'
+        ? 'Your uploaded image has been approved and is now visible to everyone'
+        : `Your uploaded image has been rejected${reason ? `: ${reason}` : ''}`;
+
+      await createNotification({
+        userId: image.userId,
+        type: notificationType,
+        title,
+        content,
+        relatedId: id,
+        relatedType: 'image',
+        actionUrl: `/image/${id}`,
+      });
+    } catch (notifyError) {
+      // 不阻塞审核流程，通知失败可以忽略
+      console.error('[Moderation] Failed to create notification:', notifyError);
+    }
+
 
     return NextResponse.json({
       success: true,

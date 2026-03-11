@@ -99,6 +99,14 @@ export function CollectionsSection() {
             </p>
           </div>
 
+          {/* View All Link */}
+          <Link
+            href="/collections"
+            className="hidden sm:inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+          >
+            查看全部 →
+          </Link>
+
           {/* Navigation Arrows - Desktop only */}
           <div className="hidden md:flex items-center gap-2">
             <button
@@ -129,7 +137,7 @@ export function CollectionsSection() {
           {collections.map((collection) => (
             <Link
               key={collection.id}
-              href={`/search?q=${encodeURIComponent(collection.name)}`}
+              href={`/collections/${collection.id}`}
               className="group flex-shrink-0 w-[280px] sm:w-[300px] snap-start"
             >
               <div className="relative h-[200px] sm:h-[220px] rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900">

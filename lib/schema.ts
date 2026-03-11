@@ -107,12 +107,14 @@ export const imageEmbeddingsRelations = relations(imageEmbeddings, ({ one }) => 
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
-  images: many(images),
-  downloads: many(downloads),
-  views: many(imageViews),
-  collections: many(collections),
-  comments: many(comments),
+images: many(images),
+downloads: many(downloads),
+views: many(imageViews),
+collections: many(collections),
+comments: many(comments),
   commentLikes: many(commentLikes),
+  notifications: many(notifications),
+  preferences: many(userPreferences),
 }));
 
 export const imagesRelations = relations(images, ({ one, many }) => ({
@@ -564,3 +566,79 @@ export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;
 export type CommentLike = typeof commentLikes.$inferSelect;
 export type NewCommentLike = typeof commentLikes.$inferInsert;
+
+
+// Notifications table for user notifications
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: text('id').primaryKey(), // UUID as text
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }), // Recipient
+    type: text('type', { 
+      enum: ['image_approved', 'image_rejected', 'new_comment', 'comment_reply', 'mention', 'collection_add'] 
+    }).notNull(),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
+    relatedId: text('related_id'), // ID of related entity (image, comment, etc.)
+    relatedType: text('related_type', { 
+      enum: ['image', 'comment', 'collection', 'user'] 
+    }),
+    isRead: boolean('is_read').default(false).notNull(),
+    actionUrl: text('action_url'), // URL to navigate when clicked
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdIdx: index('notifications_user_id_idx').on(table.userId),
+    isReadIdx: index('notifications_is_read_idx').on(table.isRead),
+    createdAtIdx: index('notifications_created_at_idx').on(table.createdAt),
+    typeIdx: index('notifications_type_idx').on(table.type),
+  })
+);
+
+// User notification preferences
+export const userPreferences = pgTable(
+  'user_preferences',
+  {
+    id: text('id').primaryKey(), // UUID as text
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' })
+      .unique(),
+    emailNotifications: boolean('email_notifications').default(true).notNull(),
+    notifyOnComment: boolean('notify_on_comment').default(true).notNull(),
+    notifyOnReply: boolean('notify_on_reply').default(true).notNull(),
+    notifyOnFollow: boolean('notify_on_follow').default(true).notNull(),
+    notifyOnImageStatus: boolean('notify_on_image_status').default(true).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+  },
+  (table) => ({
+    userIdIdx: index('user_preferences_user_id_idx').on(table.userId),
+  })
+);
+
+// Relations for notifications
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+}));
+
+// Relations for user preferences
+export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [userPreferences.userId],
+    references: [users.id],
+  }),
+}));
+
+// Type exports for Notifications
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+export type UserPreference = typeof userPreferences.$inferSelect;
+export type NewUserPreference = typeof userPreferences.$inferInsert;
+export type NotificationType = typeof notifications.$inferSelect.type;
+export type RelatedType = typeof notifications.$inferSelect.relatedType;

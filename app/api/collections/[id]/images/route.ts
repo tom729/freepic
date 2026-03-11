@@ -6,6 +6,8 @@ import { collections, images, collectionImages } from '@/lib/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { verifyAuthWithUser } from '@/lib/server-auth';
 import { randomUUID } from 'crypto';
+import { createNotification } from '@/lib/notifications';
+import { users } from '@/lib/schema';
 
 // POST /api/collections/[id]/images - Add image to collection
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
@@ -84,6 +86,33 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         updatedAt: new Date(),
       })
       .where(eq(collections.id, collectionId));
+
+    // Notify image owner (non-blocking)
+    try {
+      // Don't notify if adding own image to own collection
+      if (image.userId !== auth.userId) {
+        // Get collection owner name
+        const collectionOwner = await db.query.users.findFirst({
+          where: eq(users.id, auth.userId),
+          columns: { name: true },
+        });
+
+        const collectionOwnerName = collectionOwner?.name || 'Someone';
+
+        await createNotification({
+          userId: image.userId,
+          type: 'collection_add',
+          title: 'Your image was added to a collection',
+          content: `${collectionOwnerName} added your image to their collection "${collection.name}"`,
+          relatedId: imageId,
+          relatedType: 'image',
+          actionUrl: `/image/${imageId}`,
+        });
+      }
+    } catch (notifyError) {
+      // Don't fail the request if notification creation fails
+      console.error('[Collection API] Failed to create notification:', notifyError);
+    }
 
     return NextResponse.json({
       success: true,
