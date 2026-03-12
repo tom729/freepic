@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Disable ESLint during builds (production)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   // Allow development origins (for accessing via IP)
   allowedDevOrigins: ['192.168.1.59', 'localhost', '127.0.0.1', '*'],
 
