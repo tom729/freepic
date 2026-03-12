@@ -50,6 +50,20 @@
       "when": 1773217349444,
       "tag": "0006_heavy_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773282637947,
+      "tag": "0007_fixed_stryfe",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773283077315,
+      "tag": "0008_purple_network",
+      "breakpoints": true
     }
   ]
 }

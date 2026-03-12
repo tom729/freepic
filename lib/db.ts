@@ -1,18 +1,20 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema';
-import path from 'path';
 
-// TEMPORARY: Using SQLite for testing
-// TODO: Switch back to PostgreSQL for production
-
-const sqlite = new Database(path.join(process.cwd(), 'database', 'sqlite.db'));
-
-// Enable WAL mode for better performance
-sqlite.pragma('journal_mode = WAL');
+// Supabase PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 10, // Supabase free tier has connection limits
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  ssl: {
+    rejectUnauthorized: false, // Required for Supabase
+  },
+});
 
 // Initialize Drizzle ORM with schema
-export const db = drizzle(sqlite, { schema });
+export const db = drizzle(pool, { schema });
 
 // Export schema for type inference
 export type DB = typeof db;
@@ -21,7 +23,9 @@ export { schema };
 // Connection helper for health checks
 export async function checkDatabaseConnection(): Promise<boolean> {
   try {
-    sqlite.prepare('SELECT 1').get();
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
     return true;
   } catch (error) {
     console.error('Database connection failed:', error);
@@ -31,5 +35,8 @@ export async function checkDatabaseConnection(): Promise<boolean> {
 
 // Graceful shutdown helper
 export async function closeDatabaseConnection(): Promise<void> {
-  sqlite.close();
+  await pool.end();
 }
+
+// Export pool for direct queries if needed
+export { pool };

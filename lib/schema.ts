@@ -1,15 +1,24 @@
-import { sqliteTable, text, integer, index, unique } from 'drizzle-orm/sqlite-core';
+import {
+  pgTable,
+  text,
+  integer,
+  index,
+  timestamp,
+  jsonb,
+  boolean,
+  unique,
+} from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Users table
-export const users = sqliteTable(
+export const users = pgTable(
   'users',
   {
     id: text('id').primaryKey(),
     email: text('email', { length: 255 }).notNull().unique(),
     password: text('password', { length: 255 }),
-    isActive: integer('is_active', { mode: 'boolean' }).default(0).notNull(),
-    isAdmin: integer('is_admin', { mode: 'boolean' }).default(0).notNull(),
+    isActive: boolean('is_active').default(false).notNull(),
+    isAdmin: boolean('is_admin').default(false).notNull(),
     name: text('name', { length: 100 }),
     avatar: text('avatar'),
     bio: text('bio'),
@@ -17,8 +26,8 @@ export const users = sqliteTable(
     website: text('website', { length: 255 }),
     instagram: text('instagram', { length: 100 }),
     twitter: text('twitter', { length: 100 }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
   (table) => ({
     emailIdx: index('users_email_idx').on(table.email),
@@ -26,7 +35,7 @@ export const users = sqliteTable(
 );
 
 // Images table
-export const images = sqliteTable(
+export const images = pgTable(
   'images',
   {
     id: text('id').primaryKey(),
@@ -34,7 +43,7 @@ export const images = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     cosKey: text('cos_key').notNull(),
-    exifData: text('exif_data', { mode: 'json' }),
+    exifData: jsonb('exif_data'),
     description: text('description'),
     location: text('location'),
     status: text('status', { enum: ['pending', 'approved', 'rejected'] })
@@ -48,8 +57,8 @@ export const images = sqliteTable(
     downloads: integer('downloads').default(0),
     blurHash: text('blur_hash'),
     dominantColor: text('dominant_color'),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
   (table) => ({
     userIdIdx: index('images_user_id_idx').on(table.userId),
@@ -60,7 +69,7 @@ export const images = sqliteTable(
 );
 
 // Downloads table
-export const downloads = sqliteTable(
+export const downloads = pgTable(
   'downloads',
   {
     id: text('id').primaryKey(),
@@ -71,7 +80,7 @@ export const downloads = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     size: text('size', { enum: ['thumb', 'small', 'regular', 'large', 'full', 'original'] }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     imageIdIdx: index('downloads_image_id_idx').on(table.imageId),
@@ -81,15 +90,15 @@ export const downloads = sqliteTable(
 );
 
 // Image embeddings table
-export const imageEmbeddings = sqliteTable(
+export const imageEmbeddings = pgTable(
   'image_embeddings',
   {
     id: text('id').primaryKey(),
     imageId: text('image_id')
       .notNull()
       .references(() => images.id, { onDelete: 'cascade' }),
-    embedding: text('embedding', { mode: 'json' }).notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    embedding: jsonb('embedding').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     imageIdIdx: index('embeddings_image_id_idx').on(table.imageId),
@@ -97,7 +106,7 @@ export const imageEmbeddings = sqliteTable(
 );
 
 // Activation tokens table
-export const activationTokens = sqliteTable(
+export const activationTokens = pgTable(
   'activation_tokens',
   {
     id: text('id').primaryKey(),
@@ -105,9 +114,9 @@ export const activationTokens = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     token: text('token').notNull().unique(),
-    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-    usedAt: integer('used_at', { mode: 'timestamp' }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     userIdIdx: index('activation_tokens_user_id_idx').on(table.userId),
@@ -116,7 +125,7 @@ export const activationTokens = sqliteTable(
 );
 
 // Tags table
-export const tags = sqliteTable(
+export const tags = pgTable(
   'tags',
   {
     id: text('id').primaryKey(),
@@ -125,7 +134,7 @@ export const tags = sqliteTable(
     description: text('description'),
     color: text('color', { length: 7 }),
     imageCount: integer('image_count').default(0),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     nameIdx: index('tags_name_idx').on(table.name),
@@ -134,7 +143,7 @@ export const tags = sqliteTable(
 );
 
 // Image tags junction table
-export const imageTags = sqliteTable(
+export const imageTags = pgTable(
   'image_tags',
   {
     id: text('id').primaryKey(),
@@ -144,7 +153,7 @@ export const imageTags = sqliteTable(
     tagId: text('tag_id')
       .notNull()
       .references(() => tags.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     imageIdIdx: index('image_tags_image_id_idx').on(table.imageId),
@@ -154,7 +163,7 @@ export const imageTags = sqliteTable(
 );
 
 // Collections table
-export const collections = sqliteTable(
+export const collections = pgTable(
   'collections',
   {
     id: text('id').primaryKey(),
@@ -164,10 +173,10 @@ export const collections = sqliteTable(
     name: text('name', { length: 100 }).notNull(),
     description: text('description'),
     coverImageId: text('cover_image_id').references(() => images.id, { onDelete: 'set null' }),
-    isPublic: integer('is_public', { mode: 'boolean' }).default(1).notNull(),
+    isPublic: boolean('is_public').default(true).notNull(),
     imageCount: integer('image_count').default(0),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
   (table) => ({
     userIdIdx: index('collections_user_id_idx').on(table.userId),
@@ -177,7 +186,7 @@ export const collections = sqliteTable(
 );
 
 // Collection images junction table
-export const collectionImages = sqliteTable(
+export const collectionImages = pgTable(
   'collection_images',
   {
     id: text('id').primaryKey(),
@@ -187,7 +196,7 @@ export const collectionImages = sqliteTable(
     imageId: text('image_id')
       .notNull()
       .references(() => images.id, { onDelete: 'cascade' }),
-    addedAt: integer('added_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
     order: integer('order').default(0),
   },
   (table) => ({
@@ -198,7 +207,7 @@ export const collectionImages = sqliteTable(
 );
 
 // Featured collections table
-export const featuredCollections = sqliteTable(
+export const featuredCollections = pgTable(
   'featured_collections',
   {
     id: text('id').primaryKey(),
@@ -209,12 +218,12 @@ export const featuredCollections = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     displayOrder: integer('display_order').default(0),
-    isActive: integer('is_active', { mode: 'boolean' }).default(1).notNull(),
-    startDate: integer('start_date', { mode: 'timestamp' }),
-    endDate: integer('end_date', { mode: 'timestamp' }),
+    isActive: boolean('is_active').default(true).notNull(),
+    startDate: timestamp('start_date', { withTimezone: true }),
+    endDate: timestamp('end_date', { withTimezone: true }),
     imageCount: integer('image_count').default(0),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
   (table) => ({
     isActiveIdx: index('featured_collections_is_active_idx').on(table.isActive),
@@ -224,7 +233,7 @@ export const featuredCollections = sqliteTable(
 );
 
 // Featured collection images junction table
-export const featuredCollectionImages = sqliteTable(
+export const featuredCollectionImages = pgTable(
   'featured_collection_images',
   {
     id: text('id').primaryKey(),
@@ -234,7 +243,7 @@ export const featuredCollectionImages = sqliteTable(
     imageId: text('image_id')
       .notNull()
       .references(() => images.id, { onDelete: 'cascade' }),
-    addedAt: integer('added_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
     order: integer('order').default(0),
   },
   (table) => ({
@@ -244,7 +253,7 @@ export const featuredCollectionImages = sqliteTable(
 );
 
 // Comments table
-export const comments = sqliteTable(
+export const comments = pgTable(
   'comments',
   {
     id: text('id').primaryKey(),
@@ -260,9 +269,9 @@ export const comments = sqliteTable(
       .default('pending')
       .notNull(),
     likes: integer('likes').default(0),
-    isEdited: integer('is_edited', { mode: 'boolean' }).default(0).notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }),
+    isEdited: boolean('is_edited').default(false).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
   (table) => ({
     imageIdIdx: index('comments_image_id_idx').on(table.imageId),
@@ -274,7 +283,7 @@ export const comments = sqliteTable(
 );
 
 // Comment likes table
-export const commentLikes = sqliteTable(
+export const commentLikes = pgTable(
   'comment_likes',
   {
     id: text('id').primaryKey(),
@@ -284,7 +293,7 @@ export const commentLikes = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     commentIdIdx: index('comment_likes_comment_id_idx').on(table.commentId),
@@ -294,7 +303,7 @@ export const commentLikes = sqliteTable(
 );
 
 // Notifications table
-export const notifications = sqliteTable(
+export const notifications = pgTable(
   'notifications',
   {
     id: text('id').primaryKey(),
@@ -316,9 +325,9 @@ export const notifications = sqliteTable(
     content: text('content'),
     relatedId: text('related_id'),
     relatedType: text('related_type', { length: 50 }),
-    isRead: integer('is_read', { mode: 'boolean' }).default(0).notNull(),
+    isRead: boolean('is_read').default(false).notNull(),
     actionUrl: text('action_url'),
-    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     userIdIdx: index('notifications_user_id_idx').on(table.userId),
@@ -329,7 +338,7 @@ export const notifications = sqliteTable(
 );
 
 // User preferences table
-export const userPreferences = sqliteTable(
+export const userPreferences = pgTable(
   'user_preferences',
   {
     id: text('id').primaryKey(),
@@ -337,12 +346,12 @@ export const userPreferences = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' })
       .unique(),
-    emailNotifications: integer('email_notifications', { mode: 'boolean' }).default(1),
-    notifyOnComment: integer('notify_on_comment', { mode: 'boolean' }).default(1),
-    notifyOnReply: integer('notify_on_reply', { mode: 'boolean' }).default(1),
-    notifyOnFollow: integer('notify_on_follow', { mode: 'boolean' }).default(1),
-    notifyOnImageStatus: integer('notify_on_image_status', { mode: 'boolean' }).default(1),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }),
+    emailNotifications: boolean('email_notifications').default(true),
+    notifyOnComment: boolean('notify_on_comment').default(true),
+    notifyOnReply: boolean('notify_on_reply').default(true),
+    notifyOnFollow: boolean('notify_on_follow').default(true),
+    notifyOnImageStatus: boolean('notify_on_image_status').default(true),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
   (table) => ({
     userIdIdx: index('user_preferences_user_id_idx').on(table.userId),
