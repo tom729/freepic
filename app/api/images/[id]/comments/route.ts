@@ -183,6 +183,29 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       isEdited: false,
     });
 
+    // Fetch the newly inserted comment with user info
+    const newComment = await db
+      .select({
+        id: comments.id,
+        content: comments.content,
+        status: comments.status,
+        likes: comments.likes,
+        isEdited: comments.isEdited,
+        createdAt: comments.createdAt,
+        updatedAt: comments.updatedAt,
+        parentId: comments.parentId,
+        user: {
+          id: users.id,
+          name: users.name,
+          avatar: users.avatar,
+        },
+      })
+      .from(comments)
+      .leftJoin(users, eq(comments.userId, users.id))
+      .where(eq(comments.id, commentId));
+
+    const commenterName = newComment[0]?.user?.name || 'Someone';
+
     // Send notifications (non-blocking)
     try {
       // Get image owner info
@@ -195,8 +218,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           },
         },
       });
-
-      const commenterName = newComment[0]?.user?.name || 'Someone';
 
       // 1. Notify image owner of new comment (if not the commenter)
       if (image && image.userId !== userId) {
@@ -234,12 +255,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       // Don't fail the request if notification creation fails
       console.error('[Comments API] Failed to create notification:', notifyError);
     }
-
-    return NextResponse.json({
-      success: true,
-      comment: newComment[0],
-      message: 'Comment posted successfully and is pending approval',
-    });
 
     return NextResponse.json({
       success: true,
