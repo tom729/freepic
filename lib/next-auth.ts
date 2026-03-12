@@ -5,6 +5,31 @@ import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 
+// Extend NextAuth types
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      image: string;
+    };
+  }
+
+  interface User {
+    id?: string;
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id?: string;
+    email?: string;
+    name?: string;
+    picture?: string;
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -50,21 +75,21 @@ export const authOptions: NextAuthOptions = {
       }
       return false;
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.picture = user.image;
+        token.id = user.id || '';
+        token.email = user.email || '';
+        token.name = user.name || '';
+        token.picture = user.image || '';
       }
       return token;
     },
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.image = token.picture as string;
+        session.user.id = token.id || '';
+        session.user.email = token.email || '';
+        session.user.name = token.name || '';
+        session.user.image = token.picture || '';
       }
       return session;
     },
