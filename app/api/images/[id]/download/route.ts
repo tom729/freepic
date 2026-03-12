@@ -59,7 +59,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       })
       .from(images)
       .where(eq(images.id, id))
-      .get();
+      .limit(1)
+      .then(results => results[0]);
 
     if (!image) {
       return NextResponse.json({ error: 'Image not found' }, { status: 404 });
