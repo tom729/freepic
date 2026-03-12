@@ -253,7 +253,7 @@ export const featuredCollectionImages = pgTable(
 );
 
 // Comments table
-export const comments = pgTable(
+export const comments: any = pgTable(
   'comments',
   {
     id: text('id').primaryKey(),
