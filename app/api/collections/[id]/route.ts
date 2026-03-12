@@ -137,7 +137,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         if (!image) return null;
 
         const imageUrls = await getImageUrls(image.cosKey);
-        const authorEmail = image.user?.email || 'Unknown';
+        const authorEmail = (image.user && 'email' in image.user) ? image.user.email : 'Unknown';
         const maskedAuthor = authorEmail.includes('@')
           ? authorEmail.replace(/(.{2}).*(@.*)/, '$1***$2')
           : 'Unknown';
