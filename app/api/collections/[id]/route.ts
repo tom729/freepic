@@ -164,10 +164,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const ownerName =
       (collection.user && 'name' in collection.user ? collection.user.name : null) ||
       (collection.user && 'email' in collection.user ? collection.user.email.split('@')[0] : 'Unknown');
-    const ownerName =
-      (collection.user && 'name' in collection.user ? collection.user.name : null) ||
-      (collection.user && 'email' in collection.user ? collection.user.email.split('@')[0] : 'Unknown');
-      (collection.user?.email ? collection.user.email.split('@')[0] : 'Unknown');
 
     return NextResponse.json({
       collection: {
