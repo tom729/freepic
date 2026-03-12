@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
         const camera = exif.cameraModel
           ? `${exif.cameraMake || ''} ${exif.cameraModel}`.trim()
           : 'Unknown Camera';
-        const email = img.user?.email || 'Unknown';
+        const email = (img.user && 'email' in img.user ? img.user.email : null) || 'Unknown';
         const maskedEmail = email.includes('@')
           ? email.replace(/(.{2}).*(@.*)/, '$1***$2')
           : 'Unknown';

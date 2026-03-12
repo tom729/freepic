@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     // Calculate similarity scores in JavaScript
     const scoredImages = embeddingsData.map((item) => {
       try {
-        const imageEmbedding = deserializeEmbedding(item.embedding);
+        const imageEmbedding = deserializeEmbedding(item.embedding as string);
         const similarity = cosineSimilarity(queryEmbedding, imageEmbedding);
         return { imageId: item.imageId, similarity };
       } catch {

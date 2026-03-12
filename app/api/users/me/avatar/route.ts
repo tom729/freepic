@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       const filename = `avatar-${uuidv4()}.jpg`;
       console.log('[Avatar Upload] Generated filename:', filename);
       console.log('[Avatar Upload] UserId for upload:', userId);
-      const result = await uploadImage(processedBuffer, filename, 'image/jpeg', userId);
+      const result = await uploadImage(processedBuffer, filename, 'image/jpeg', userId!);
       avatarUrl = result.url;
       console.log('[Avatar Upload] Uploaded to COS:', avatarUrl);
     }
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         avatar: avatarUrl,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, userIdForUpdate));
+      .where(eq(users.id, userIdForUpdate!));
 
     return NextResponse.json({
       success: true,

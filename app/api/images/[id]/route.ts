@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const originalUrl = await getImageUrl(image.cosKey, { size: 'original', expires: 3600 });
 
     // 从邮箱生成作者名
-    const authorEmail = image.user?.email || 'Unknown';
+    const authorEmail = (image.user && 'email' in image.user ? image.user.email : null) || 'Unknown';
     const maskedAuthor = authorEmail.includes('@')
       ? authorEmail.replace(/(.{2}).*(@.*)/, '$1***$2')
       : 'Unknown';

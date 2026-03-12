@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notifications } from '@/lib/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { verifyAuthWithUser } from '@/lib/server-auth';
 
 // GET /api/users/me/notifications/unread-count - Get unread count for badge
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await db
-      .select({ count: db.fn.count() })
+      .select({ count: sql`count(*)`.mapWith(Number) })
       .from(notifications)
       .where(and(eq(notifications.userId, auth.userId), eq(notifications.isRead, false)));
 

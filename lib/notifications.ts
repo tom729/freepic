@@ -1,7 +1,11 @@
 import { db } from './db';
-import { notifications, userPreferences, NotificationType, RelatedType } from './schema';
-import { eq, and } from 'drizzle-orm';
+import { notifications, userPreferences } from './schema';
+import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
+
+// Define notification types
+type NotificationType = 'new_comment' | 'comment_reply' | 'image_approved' | 'image_rejected' | 'collection_add' | 'mention' | 'system';
+type RelatedType = 'image' | 'comment' | 'user';
 
 export interface CreateNotificationParams {
   userId: string; // Recipient
@@ -12,6 +16,14 @@ export interface CreateNotificationParams {
   relatedType?: RelatedType;
   actionUrl?: string;
 }
+
+
+
+
+
+
+
+
 
 /**
  * Create a notification for a user
@@ -30,21 +42,29 @@ export async function createNotification(params: CreateNotificationParams): Prom
 
       switch (params.type) {
         case 'new_comment':
-          shouldNotify = prefs.notifyOnComment;
+          shouldNotify = !!prefs.notifyOnComment;
           break;
         case 'comment_reply':
-          shouldNotify = prefs.notifyOnReply;
+          shouldNotify = !!prefs.notifyOnReply;
           break;
         case 'image_approved':
         case 'image_rejected':
-          shouldNotify = prefs.notifyOnImageStatus;
+          shouldNotify = !!prefs.notifyOnImageStatus;
           break;
         case 'collection_add':
         case 'mention':
-        case 'follow':
           // For these types, use general emailNotifications setting
-          shouldNotify = prefs.emailNotifications;
+          shouldNotify = !!prefs.emailNotifications;
           break;
+        default:
+          // For other types (including 'follow'), use general emailNotifications setting
+          shouldNotify = !!prefs.emailNotifications;
+          break;
+
+
+
+
+
       }
 
       if (!shouldNotify) {
@@ -119,7 +139,7 @@ export async function getOrCreateUserPreferences(userId: string) {
 export async function getUnreadCount(userId: string): Promise<number> {
   try {
     const result = await db
-      .select({ count: db.fn.count() })
+      .select({ count: sql`count(*)`.mapWith(Number) })
       .from(notifications)
       .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
 

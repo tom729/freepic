@@ -33,7 +33,8 @@ export async function generateMetadata({ params }: UserPageProps): Promise<Metad
     })
     .from(users)
     .where(eq(users.id, params.id))
-    .get();
+    .limit(1)
+    .then(results => results[0]);
     
   if (!user) return { title: '用户未找到' };
   
@@ -64,7 +65,8 @@ export default async function UserPage({ params }: UserPageProps) {
     })
     .from(users)
     .where(eq(users.id, id))
-    .get();
+    .limit(1)
+    .then(results => results[0]);
 
   if (!user) {
     notFound();

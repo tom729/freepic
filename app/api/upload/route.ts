@@ -95,7 +95,7 @@ async function checkDuplicateUpload(
       if (!img.embedding) continue;
 
       try {
-        const existingEmbedding = deserializeEmbedding(img.embedding);
+        const existingEmbedding = deserializeEmbedding(img.embedding as string);
         const similarity = cosineSimilarity(uploadEmbedding, existingEmbedding);
 
         if (similarity >= DUPLICATE_THRESHOLD) {
@@ -452,13 +452,13 @@ export async function POST(request: NextRequest) {
         fileSize: file.size,
         fileHash, // MD5 hash for duplicate detection
         blurHash, // Progressive loading: blur placeholder
-        blurHash, // Progressive loading: blur placeholder
         dominantColor, // Progressive loading: dominant color
         description: description || null,
         location: exifData.gps?.formatted || null,
         createdAt: new Date(),
       })
       .returning();
+
 
     // 异步触发内容审核（不等待结果）
     triggerModeration(image.id, uploadResult.url).catch((err) => {

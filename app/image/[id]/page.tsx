@@ -101,7 +101,7 @@ export default async function ImagePage({ params }: ImagePageProps) {
       height: images.height,
       fileSize: images.fileSize,
       downloads: images.downloads,
-      views: images.views,
+
       exifData: images.exifData,
       createdAt: images.createdAt,
       userId: images.userId,
@@ -118,7 +118,8 @@ export default async function ImagePage({ params }: ImagePageProps) {
     .from(images)
     .leftJoin(users, eq(images.userId, users.id))
     .where(eq(images.id, id))
-    .get();
+    .limit(1)
+    .then(results => results[0]);
 
   if (!imageData || imageData.status !== 'approved') {
     notFound();
@@ -200,7 +201,7 @@ export default async function ImagePage({ params }: ImagePageProps) {
               {/* Image Actions Bar */}
               <div className="mt-4 flex items-center justify-between rounded-xl bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-4">
-                  <ViewCountDisplay count={image.views || 0} />
+                  <ViewCountDisplay count={0} />
                   <span className="text-neutral-300">|</span>
                   <span className="flex items-center gap-1.5 text-sm text-neutral-500">
                     <Download className="h-4 w-4" />

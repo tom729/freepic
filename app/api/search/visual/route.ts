@@ -126,7 +126,7 @@ async function searchImagesByEmbedding(
   // Calculate similarity scores
   const scoredImages = embeddingsData.map((item) => {
     try {
-      const imageEmbedding = deserializeEmbedding(item.embedding);
+      const imageEmbedding = deserializeEmbedding(item.embedding as string);
       const similarity = cosineSimilarity(queryEmbedding, imageEmbedding);
       return { imageId: item.imageId, similarity };
     } catch {
@@ -182,7 +182,7 @@ async function searchImagesByEmbedding(
       const camera = exif.cameraModel
         ? `${exif.cameraMake || ''} ${exif.cameraModel}`.trim()
         : 'Unknown Camera';
-      const email = img.user?.email || 'Unknown';
+      const email = (img.user && 'email' in img.user ? img.user.email : null) || 'Unknown';
       const maskedEmail = email.includes('@')
         ? email.replace(/(.{2}).*(@.*)/, '$1***$2')
         : 'Unknown';

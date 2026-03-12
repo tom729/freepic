@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notifications } from '@/lib/schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, sql } from 'drizzle-orm';
 import { verifyAuthWithUser } from '@/lib/server-auth';
 
 // GET /api/users/me/notifications - Get user's notifications (paginated)
@@ -25,12 +25,12 @@ export async function GET(request: NextRequest) {
     // Build where condition
     let whereCondition = eq(notifications.userId, auth.userId);
     if (unreadOnly) {
-      whereCondition = and(whereCondition, eq(notifications.isRead, false));
+      whereCondition = and(whereCondition, eq(notifications.isRead, false))!;
     }
 
     // Get total count
     const countResult = await db
-      .select({ count: db.fn.count() })
+      .select({ count: sql`count(*)`.mapWith(Number) })
       .from(notifications)
       .where(whereCondition);
 
