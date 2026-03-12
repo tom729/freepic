@@ -358,6 +358,51 @@ export const userPreferences = pgTable(
   })
 );
 
+// Image views table (for analytics)
+export const imageViews = pgTable(
+  'image_views',
+  {
+    id: text('id').primaryKey(),
+    imageId: text('image_id')
+      .notNull()
+      .references(() => images.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sessionId: text('session_id'),
+    ipHash: text('ip_hash'),
+    userAgent: text('user_agent'),
+    referrer: text('referrer'),
+    viewedAt: timestamp('viewed_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    imageIdIdx: index('image_views_image_id_idx').on(table.imageId),
+    userIdIdx: index('image_views_user_id_idx').on(table.userId),
+    sessionIdIdx: index('image_views_session_id_idx').on(table.sessionId),
+    viewedAtIdx: index('image_views_viewed_at_idx').on(table.viewedAt),
+  })
+);
+
+// Image view aggregates table (daily stats)
+export const imageViewAggregates = pgTable(
+  'image_view_aggregates',
+  {
+    id: text('id').primaryKey(),
+    imageId: text('image_id')
+      .notNull()
+      .references(() => images.id, { onDelete: 'cascade' }),
+    date: timestamp('date', { withTimezone: true }).notNull(),
+    totalViews: integer('total_views').default(0),
+    uniqueViews: integer('unique_views').default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+  },
+  (table) => ({
+    imageIdIdx: index('image_view_aggregates_image_id_idx').on(table.imageId),
+    dateIdx: index('image_view_aggregates_date_idx').on(table.date),
+    uniqueIdx: unique('image_view_aggregates_unique_idx').on(table.imageId, table.date),
+  })
+);
+
 // Relations
 export const imageEmbeddingsRelations = relations(imageEmbeddings, ({ one }) => ({
   image: one(images, {
@@ -510,6 +555,24 @@ export const userPreferencesRelations = relations(userPreferences, ({ one }) => 
   }),
 }));
 
+export const imageViewsRelations = relations(imageViews, ({ one }) => ({
+  image: one(images, {
+    fields: [imageViews.imageId],
+    references: [images.id],
+  }),
+  user: one(users, {
+    fields: [imageViews.userId],
+    references: [users.id],
+  }),
+}));
+
+export const imageViewAggregatesRelations = relations(imageViewAggregates, ({ one }) => ({
+  image: one(images, {
+    fields: [imageViewAggregates.imageId],
+    references: [images.id],
+  }),
+}));
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -541,3 +604,7 @@ export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
 export type UserPreference = typeof userPreferences.$inferSelect;
 export type NewUserPreference = typeof userPreferences.$inferInsert;
+export type ImageView = typeof imageViews.$inferSelect;
+export type NewImageView = typeof imageViews.$inferInsert;
+export type ImageViewAggregate = typeof imageViewAggregates.$inferSelect;
+export type NewImageViewAggregate = typeof imageViewAggregates.$inferInsert;
