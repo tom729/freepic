@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { comments, users, commentLikes, images } from '@/lib/schema';
-import { eq, and, desc, isNull } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { verifyAuthWithUser } from '@/lib/server-auth';
 import { createNotification } from '@/lib/notifications';
 import crypto from 'crypto';
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const userId = authResult.userId;
 
     // Build where condition based on user role
-    let whereCondition: any;
+    let whereCondition: ReturnType<typeof eq> | ReturnType<typeof and>;
     if (isAdmin) {
       // Admin can see all comments
       whereCondition = eq(comments.imageId, id);

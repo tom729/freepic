@@ -3,9 +3,7 @@ import Database from 'better-sqlite3';
 import * as schema from './schema';
 import path from 'path';
 
-// TEMPORARY: Using SQLite for testing
-// TODO: Switch back to PostgreSQL for production
-
+// SQLite database for quick testing
 const sqlite = new Database(path.join(process.cwd(), 'database', 'sqlite.db'));
 
 // Enable WAL mode for better performance

@@ -93,11 +93,10 @@ export function AddToCollectionButton({
 
         // Update collection count
         setCollections((prev) =>
-          prev.map(
-            (c =
-              c.id === collectionId
-                ? { ...c, imageCount: c.imageCount + (isInCollection ? -1 : 1) }
-                : c)
+          prev.map((c) =>
+            c.id === collectionId
+              ? { ...c, imageCount: c.imageCount + (isInCollection ? -1 : 1) }
+              : c
           )
         );
       }

@@ -162,7 +162,7 @@ export function CommentSection({ imageId, className }: CommentSectionProps) {
 
   const handleReplyAdded = (parentId: string, reply: Comment) => {
     setComments((prev) =>
-      prev.map((c = c.id === parentId ? { ...c, replies: [...(c.replies || []), reply] } : c))
+      prev.map((c) => (c.id === parentId ? { ...c, replies: [...(c.replies || []), reply] } : c))
     );
     setTotalCount((prev) => prev + 1);
   };

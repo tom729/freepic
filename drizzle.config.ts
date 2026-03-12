@@ -1,11 +1,11 @@
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
-  dialect: 'postgresql',
+  dialect: 'sqlite',
   schema: './lib/schema.ts',
   out: './database/migrations',
   dbCredentials: {
-    url: process.env.DATABASE_URL || 'postgresql://localhost:5432/freepic',
+    url: './database/sqlite.db',
   },
   verbose: true,
   strict: true,

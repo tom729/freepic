@@ -1,9 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import {
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -12,7 +23,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Loader2,
   TrendingUp,
   Eye,
   Download,
@@ -44,60 +54,50 @@ interface StatsData {
     views: number;
   }>;
   referrers: Array<{
-    source: string;
-    count: number;
+    name: string;
+    value: number;
   }>;
 }
 
 interface AnalyticsDashboardProps {
   className?: string;
 }
+const getMockData = (): StatsData => ({
+  totalViews: 15420,
+  totalDownloads: 3420,
+  totalUsers: 856,
+  totalImages: 1240,
+  viewsChange: 12.5,
+  downloadsChange: 8.3,
+  usersChange: -2.1,
+  imagesChange: 15.7,
+  topImages: [
+    { id: '1', url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=100', views: 1205, downloads: 156, author: 'user1' },
+    { id: '2', url: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=100', views: 892, downloads: 123, author: 'user2' },
+    { id: '3', url: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=100', views: 756, downloads: 98, author: 'user3' },
+    { id: '4', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=100', views: 643, downloads: 87, author: 'user4' },
+    { id: '5', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100', views: 521, downloads: 76, author: 'user5' },
+  ],
+  viewsOverTime: [
+    { date: '周一', views: 2340 },
+    { date: '周二', views: 2890 },
+    { date: '周三', views: 2156 },
+    { date: '周四', views: 3120 },
+    { date: '周五', views: 2890 },
+    { date: '周六', views: 3567 },
+    { date: '周日', views: 2457 },
+  ],
+  referrers: [
+    { name: '直接访问', value: 5234 },
+    { name: 'Google', value: 3456 },
+    { name: '社交媒体', value: 2345 },
+    { name: '外部链接', value: 1234 },
+    { name: '其他', value: 567 },
+  ],
+});
 
-// Simple bar chart component without recharts
-function SimpleBarChart({ data }: { data: Array<{ date: string; views: number }> }) {
-  const maxValue = Math.max(...data.map((d) => d.views), 1);
+const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
 
-  return (
-    <div className="space-y-2">
-      {data.map((item, index) => (
-        <div key={index} className="flex items-center gap-3">
-          <span className="text-xs text-neutral-500 w-16 truncate">{item.date}</span>
-          <div className="flex-1 h-6 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-              style={{ width: `${(item.views / maxValue) * 100}%` }}
-            />
-          </div>
-          <span className="text-xs text-neutral-600 w-12 text-right">{item.views}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Simple horizontal bar chart for referrers
-function ReferrerChart({ data }: { data: Array<{ source: string; count: number }> }) {
-  const maxValue = Math.max(...data.map((d) => d.count), 1);
-
-  return (
-    <div className="space-y-2">
-      {data.map((item, index) => (
-        <div key={index} className="flex items-center gap-3">
-          <span className="text-xs text-neutral-500 w-24 truncate">{item.source}</span>
-          <div className="flex-1 h-5 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-              style={{ width: `${(item.count / maxValue) * 100}%` }}
-            />
-          </div>
-          <span className="text-xs text-neutral-600 w-10 text-right">{item.count}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Stat card component
 function StatCard({
   title,
   value,
@@ -141,8 +141,8 @@ function StatCard({
               trend === 'up'
                 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30'
                 : trend === 'down'
-                  ? 'bg-red-100 text-red-600 dark:bg-red-900/30'
-                  : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30'
+                ? 'bg-red-100 text-red-600 dark:bg-red-900/30'
+                : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30'
             )}
           >
             <Icon className="h-5 w-5" />
@@ -154,109 +154,11 @@ function StatCard({
 }
 
 export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState('7d');
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/analytics?range=${timeRange}`);
-
-        if (!response.ok) {
-          // If API doesn't exist yet, use mock data
-          if (response.status === 404) {
-            setStats(getMockData());
-            return;
-          }
-          throw new Error('Failed to fetch analytics');
-        }
-
-        const data = await response.json();
-        setStats(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load analytics');
-        // Use mock data on error
-        setStats(getMockData());
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, [timeRange]);
-
-  const getMockData = (): StatsData => ({
-    totalViews: 15420,
-    totalDownloads: 3420,
-    totalUsers: 856,
-    totalImages: 1240,
-    viewsChange: 12.5,
-    downloadsChange: 8.3,
-    usersChange: -2.1,
-    imagesChange: 15.7,
-    topImages: [
-      {
-        id: '1',
-        url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=100',
-        views: 1205,
-        downloads: 156,
-        author: 'user1',
-      },
-      {
-        id: '2',
-        url: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=100',
-        views: 892,
-        downloads: 123,
-        author: 'user2',
-      },
-      {
-        id: '3',
-        url: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=100',
-        views: 756,
-        downloads: 98,
-        author: 'user3',
-      },
-    ],
-    viewsOverTime: [
-      { date: '周一', views: 2340 },
-      { date: '周二', views: 2890 },
-      { date: '周三', views: 2156 },
-      { date: '周四', views: 3120 },
-      { date: '周五', views: 2890 },
-      { date: '周六', views: 3567 },
-      { date: '周日', views: 2457 },
-    ],
-    referrers: [
-      { source: '直接访问', count: 5234 },
-      { source: 'Google', count: 3456 },
-      { source: '社交媒体', count: 2345 },
-      { source: '外部链接', count: 1234 },
-      { source: '其他', count: 567 },
-    ],
-  });
-
-  if (isLoading) {
-    return (
-      <div className={cn('flex items-center justify-center py-12', className)}>
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
-
-  if (!stats) {
-    return (
-      <div className={cn('text-center py-12', className)}>
-        <p className="text-neutral-500">暂无数据</p>
-      </div>
-    );
-  }
+  const [stats] = useState<StatsData>(getMockData());
 
   return (
     <div className={cn('space-y-6', className)}>
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">数据分析</h2>
@@ -275,7 +177,6 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
         </Select>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="总浏览量"
@@ -307,7 +208,6 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
         />
       </div>
 
-      {/* Charts */}
       <Tabs defaultValue="views" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="views">浏览趋势</TabsTrigger>
@@ -324,7 +224,23 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
               <CardDescription>每日浏览量统计</CardDescription>
             </CardHeader>
             <CardContent>
-              <SimpleBarChart data={stats.viewsOverTime} />
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats.viewsOverTime}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="views"
+                      stroke="#6366f1"
+                      strokeWidth={2}
+                      dot={{ fill: '#6366f1', r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -336,25 +252,44 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
               <CardDescription>用户访问来源分布</CardDescription>
             </CardHeader>
             <CardContent>
-              <ReferrerChart data={stats.referrers} />
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={stats.referrers}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) =>
+                        `${name} ${((percent || 0) * 100).toFixed(0)}%`
+                      }
+                      dataKey="value"
+                    >
+                      {stats.referrers.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Top Images */}
       <Card>
         <CardHeader>
           <CardTitle>热门图片</CardTitle>
           <CardDescription>浏览量最高的图片</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {stats.topImages.map((image, index) => (
               <a
                 key={image.id}
                 href={`/image/${image.id}`}
-                className="group relative aspect-[4/3] rounded-lg overflow-hidden"
+                className="group relative aspect-square rounded-lg overflow-hidden"
               >
                 <img
                   src={image.url}

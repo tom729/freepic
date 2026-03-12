@@ -304,7 +304,7 @@ export default function ModerationPage() {
                           </button>
                         </div>
                       )}
-                      )}
+
 
                       {/* Actions for approved/rejected tabs */}
                       {activeTab === 'approved' && (
