@@ -41,37 +41,57 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {
         const email = user.email?.toLowerCase().trim();
-        if (!email) return false;
-
-        // Check if user exists
-        const existingUser = await db.query.users.findFirst({
-          where: eq(users.email, email),
-        });
-
-        if (!existingUser) {
-          // Create new user from Google OAuth
-          const newUserId = crypto.randomUUID();
-          await db.insert(users).values({
-            id: newUserId,
-            email: email,
-            name: user.name || profile?.name || email.split('@')[0],
-            avatar: user.image,
-            isActive: true, // OAuth users are auto-activated
-            isAdmin: false,
-            createdAt: new Date(),
-          });
-          user.id = newUserId;
-        } else {
-          // Update existing user's avatar if changed
-          if (user.image && existingUser.avatar !== user.image) {
-            await db
-              .update(users)
-              .set({ avatar: user.image, updatedAt: new Date() })
-              .where(eq(users.id, existingUser.id));
-          }
-          user.id = existingUser.id;
+        if (!email) {
+          console.error('[NextAuth] No email provided by Google');
+          return false;
         }
-        return true;
+
+        try {
+          // Check if user exists
+          let existingUser = null;
+          try {
+            existingUser = await db.query.users.findFirst({
+              where: eq(users.email, email),
+            });
+          } catch (dbError) {
+            console.error('[NextAuth] Database query error:', dbError);
+            // Try one more time after a short delay
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            existingUser = await db.query.users.findFirst({
+              where: eq(users.email, email),
+            });
+          }
+
+          if (!existingUser) {
+            // Create new user from Google OAuth
+            const newUserId = crypto.randomUUID();
+            await db.insert(users).values({
+              id: newUserId,
+              email: email,
+              name: user.name || profile?.name || email.split('@')[0],
+              avatar: user.image,
+              isActive: true,
+              isAdmin: false,
+              createdAt: new Date(),
+            });
+            user.id = newUserId;
+            console.log('[NextAuth] Created new user:', newUserId);
+          } else {
+            // Update existing user's avatar if changed
+            if (user.image && existingUser.avatar !== user.image) {
+              await db
+                .update(users)
+                .set({ avatar: user.image, updatedAt: new Date() })
+                .where(eq(users.id, existingUser.id));
+            }
+            user.id = existingUser.id;
+            console.log('[NextAuth] Existing user logged in:', existingUser.id);
+          }
+          return true;
+        } catch (error) {
+          console.error('[NextAuth] Error in signIn callback:', error);
+          return false;
+        }
       }
       return false;
     },
@@ -100,10 +120,9 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
-    maxAge: 7 * 24 * 60 * 60, // 7 days
+    maxAge: 7 * 24 * 60 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET,
-  // Required for production deployments
   trustHost: true,
-};
+  debug: process.env.NODE_ENV === 'development',
 };
