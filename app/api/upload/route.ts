@@ -427,24 +427,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 检测重复上传（需要用户已有 embedding 的图片）
-    console.log('[Upload] Checking for duplicate uploads...');
-    console.time('[Upload] Embedding'); const duplicateCheck = await checkDuplicateUpload(userId, file); console.timeEnd('[Upload] Embedding');
 
-    if (duplicateCheck.isDuplicate) {
-      const similar = duplicateCheck.similarImages[0];
-      return NextResponse.json(
-        {
-          error: '检测到重复或高度相似的图片',
-          details: `您已上传过相似度为 ${similar.similarity * 100}% 的图片，请不要重复上传`,
-          similarImage: {
-            id: similar.id,
-            similarity: similar.similarity,
-          },
-        },
-        { status: 409 } // Conflict
-      );
-    }
+    // 跳过同步 embedding 检测（太慢），改用后台异步处理
+    // 上传后会自动通过 queueEmbeddingGeneration 生成 embedding
 
     // 上传文件（演示模式或 COS）
     let uploadResult;
