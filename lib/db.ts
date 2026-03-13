@@ -13,19 +13,9 @@ const pool = new Pool({
     rejectUnauthorized: false,
   },
   allowExitOnIdle: false,
-  family: 4,
+
 });
-  connectionString: process.env.DATABASE_URL,
-  max: 5, // Reduce max connections for Supabase free tier
-  min: 1, // Keep minimum 1 connection
-  idleTimeoutMillis: 60000, // Increase idle timeout
-  connectionTimeoutMillis: 10000, // Increase connection timeout
-  ssl: {
-    rejectUnauthorized: false, // Required for Supabase
-  },
-  // Retry failed connections
-  allowExitOnIdle: false,
-});
+
 
 // Handle pool errors
 pool.on('error', (err) => {
