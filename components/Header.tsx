@@ -3,22 +3,62 @@ import { NotificationBell } from './NotificationBell';
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import { useAuthStore } from '@/stores/auth';
-import { User, LogOut, Upload, Bell } from 'lucide-react';
+import { User, LogOut, Upload, Bell, Loader2 } from 'lucide-react';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { data: session, status } = useSession();
+  const { user, logout } = useAuthStore();
+
+  const isAuthenticated = !!session?.user;
+  const currentUser = session?.user || user;
+
+  // Loading state
+  const isLoading = status === 'loading';
 
   // Debug: log auth state changes
   useEffect(() => {
-    console.log('[Header] Auth state:', { user: user?.email, isAuthenticated });
-  }, [user, isAuthenticated]);
+    console.log('[Header] NextAuth session:', {
+      session: session?.user?.email,
+      status,
+      isAuthenticated,
+    });
+  }, [session, status, isAuthenticated]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Sign out from NextAuth
+    await signOut({ callbackUrl: '/' });
+    // Also clear Zustand store
     logout();
-    window.location.href = '/';
   };
+
+  if (isLoading) {
+    return (
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200/80 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-8 w-8"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
+              <path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-lg font-semibold tracking-tight text-gray-900">FreePic</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200/80 bg-white/80 backdrop-blur-md">
@@ -92,7 +132,7 @@ export function Header() {
           <NotificationBell className="hidden md:flex" />
 
           {/* User Section */}
-          {isAuthenticated && user ? (
+          {isAuthenticated && currentUser ? (
             <div className="flex items-center gap-2">
               <Link
                 href="/profile"
@@ -100,9 +140,9 @@ export function Header() {
               >
                 <User className="h-4 w-4 text-gray-600" />
                 <span className="text-sm text-gray-700">
-                  {user?.email?.includes('@')
-                    ? user.email.replace(/(.{2}).*(@.*)/, '$1***$2')
-                    : user?.email || ''}
+                  {currentUser.email?.includes('@')
+                    ? currentUser.email.replace(/(.{2}).*(@.*)/, '$1***$2')
+                    : currentUser.email || ''}
                 </span>
               </Link>
               <button
@@ -176,9 +216,9 @@ export function Header() {
             {isAuthenticated ? (
               <>
                 <div className="px-4 py-3 text-sm text-gray-600 border-t border-gray-100 mt-2 min-h-[44px] flex items-center">
-                  {user?.email?.includes('@')
-                    ? user.email.replace(/(.{2}).*(@.*)/, '$1***$2')
-                    : user?.email || ''}
+                  {currentUser?.email?.includes('@')
+                    ? currentUser.email.replace(/(.{2}).*(@.*)/, '$1***$2')
+                    : currentUser?.email || ''}
                 </div>
                 <button
                   onClick={() => {
