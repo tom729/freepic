@@ -2,13 +2,45 @@
 import { NotificationBell } from './NotificationBell';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth';
-import { User, LogOut, Upload, Bell } from 'lucide-react';
+import { User, LogOut, Upload, Bell, Loader2 } from 'lucide-react';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated, logout, init, isLoading } = useAuthStore();
+
+  // Initialize auth state on mount
+  useEffect(() => {
+    init();
+  }, [init]);
+
+  // Show loading state while rehydrating
+  if (isLoading) {
+    return (
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200/80 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-8 w-8"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
+              <path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-lg font-semibold tracking-tight text-gray-900">FreePic</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   const handleLogout = () => {
     logout();
@@ -86,7 +118,6 @@ export function Header() {
           {/* Notification Bell */}
           <NotificationBell className="hidden md:flex" />
 
-
           {/* User Section */}
           {isAuthenticated && user ? (
             <div className="flex items-center gap-2">
@@ -96,7 +127,9 @@ export function Header() {
               >
                 <User className="h-4 w-4 text-gray-600" />
                 <span className="text-sm text-gray-700">
-                  {user?.email?.includes('@') ? user.email.replace(/(.{2}).*(@.*)/, '$1***$2') : user?.email || ''}
+                  {user?.email?.includes('@')
+                    ? user.email.replace(/(.{2}).*(@.*)/, '$1***$2')
+                    : user?.email || ''}
                 </span>
               </Link>
               <button
@@ -167,11 +200,12 @@ export function Header() {
               </MobileNavLink>
             )}
 
-
             {isAuthenticated ? (
               <>
                 <div className="px-4 py-3 text-sm text-gray-600 border-t border-gray-100 mt-2 min-h-[44px] flex items-center">
-                  {user?.email?.includes('@') ? user.email.replace(/(.{2}).*(@.*)/, '$1***$2') : user?.email || ''}
+                  {user?.email?.includes('@')
+                    ? user.email.replace(/(.{2}).*(@.*)/, '$1***$2')
+                    : user?.email || ''}
                 </div>
                 <button
                   onClick={() => {

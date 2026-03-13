@@ -30,7 +30,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
@@ -59,8 +59,11 @@ export const useAuthStore = create<AuthState>()(
 
       setLoading: (loading) => set({ isLoading: loading }),
 
-      // 初始化完成
-      init: () => set({ isLoading: false }),
+      // Initialize - sync state from storage
+      init: () => {
+        const state = get();
+        set({ isLoading: false, isAuthenticated: !!state.token, user: state.user });
+      },
     }),
     {
       name: 'auth-storage',
@@ -69,14 +72,6 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
-      // 从存储恢复后，设置加载完成
-      onRehydrateStorage: (state) => {
-        return (state) => {
-          if (state) {
-            state.isLoading = false;
-          }
-        };
-      },
     }
   )
 );
