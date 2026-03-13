@@ -24,46 +24,48 @@ interface AuthState {
   setUser: (user: User, token: string) => void;
   updateUser: (user: Partial<User>) => void;
   logout: () => void;
-  setLoading: (loading: boolean) => void;
   init: () => void;
+  setLoading: (loading: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       token: null,
       isAuthenticated: false,
-      isLoading: true,
+      isLoading: false,
 
-      setUser: (user, token) =>
+      setUser: (user, token) => {
+        console.log('[AuthStore] setUser called:', user.email, 'token:', token ? 'yes' : 'no');
         set({
           user,
           token,
           isAuthenticated: true,
           isLoading: false,
-        }),
+        });
+      },
 
       updateUser: (userData) =>
         set((state) => ({
           user: state.user ? { ...state.user, ...userData } : null,
         })),
 
-      logout: () =>
+      logout: () => {
+        console.log('[AuthStore] logout called');
         set({
           user: null,
           token: null,
           isAuthenticated: false,
           isLoading: false,
-        }),
+        });
+      },
+
+      init: () => {
+        // State is automatically rehydrated from localStorage by persist middleware
+      },
 
       setLoading: (loading) => set({ isLoading: loading }),
-
-      // Initialize - sync state from storage
-      init: () => {
-        const state = get();
-        set({ isLoading: false, isAuthenticated: !!state.token, user: state.user });
-      },
     }),
     {
       name: 'auth-storage',

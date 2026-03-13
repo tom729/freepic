@@ -4,43 +4,16 @@ import { NotificationBell } from './NotificationBell';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth';
-import { User, LogOut, Upload, Bell, Loader2 } from 'lucide-react';
+import { User, LogOut, Upload, Bell } from 'lucide-react';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout, init, isLoading } = useAuthStore();
+  const { user, isAuthenticated, logout } = useAuthStore();
 
-  // Initialize auth state on mount
+  // Debug: log auth state changes
   useEffect(() => {
-    init();
-  }, [init]);
-
-  // Show loading state while rehydrating
-  if (isLoading) {
-    return (
-      <header className="sticky top-0 z-50 w-full border-b border-gray-200/80 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-8 w-8"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
-              <path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="text-lg font-semibold tracking-tight text-gray-900">FreePic</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-          </div>
-        </div>
-      </header>
-    );
-  }
+    console.log('[Header] Auth state:', { user: user?.email, isAuthenticated });
+  }, [user, isAuthenticated]);
 
   const handleLogout = () => {
     logout();
