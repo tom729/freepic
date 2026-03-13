@@ -95,7 +95,7 @@ async function checkDuplicateUpload(
 }> {
   try {
     // 读取文件并生成 embedding
-    const bytes = await file.arrayBuffer();
+    console.time("[Upload] Read buffer"); const bytes = await file.arrayBuffer(); console.timeEnd("[Upload] Read buffer");
     const base64Image = Buffer.from(bytes).toString('base64');
     const dataUrl = `data:${file.type};base64,${base64Image}`;
 
@@ -353,7 +353,7 @@ export async function POST(request: NextRequest) {
     const { isAuthenticated, user } = await verifyAuthWithUser(request);
 
     if (!isAuthenticated) {
-      return NextResponse.json({ error: '请先登录后再上传图片' }, { status: 401 });
+      console.timeEnd('[Upload] Total'); return NextResponse.json({ error: '请先登录后再上传图片' }, { status: 401 });
     }
 
     // 检查账号是否已激活
@@ -364,7 +364,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
+    console.time('[Upload] Total'); const formData = await request.formData();
     const file = formData.get('file') as File;
     const description = formData.get('description') as string | null;
 
@@ -372,7 +372,7 @@ export async function POST(request: NextRequest) {
     const userId = user.id;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      console.timeEnd('[Upload] Total'); return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     // 验证文件类型
@@ -386,19 +386,19 @@ export async function POST(request: NextRequest) {
     // 验证文件大小（50MB）
     const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File too large. Maximum size is 50MB.' }, { status: 400 });
+      console.timeEnd('[Upload] Total'); return NextResponse.json({ error: 'File too large. Maximum size is 50MB.' }, { status: 400 });
     }
 
     // 读取文件buffer
-    const bytes = await file.arrayBuffer();
+    console.time("[Upload] Read buffer"); const bytes = await file.arrayBuffer(); console.timeEnd("[Upload] Read buffer");
     const buffer = Buffer.from(bytes);
 
     // 计算文件 MD5 哈希（用于快速重复检测）
-    const fileHash = calculateFileHash(buffer);
+    console.time('[Upload] MD5 hash'); const fileHash = calculateFileHash(buffer); console.timeEnd('[Upload] MD5 hash');
     console.log(`[Upload] File hash: ${fileHash}`);
 
     // 基于文件哈希的快速重复检测（100% 准确）
-    const hashCheck = await checkDuplicateByHash(userId, fileHash);
+    console.time('[Upload] Hash check'); const hashCheck = await checkDuplicateByHash(userId, fileHash); console.timeEnd('[Upload] Hash check');
     if (hashCheck.isDuplicate) {
       return NextResponse.json(
         {
@@ -413,10 +413,10 @@ export async function POST(request: NextRequest) {
     // 提取EXIF数据
 
     // 提取EXIF数据
-    const exifData = extractExifData(buffer, file.type);
+    console.time('[Upload] EXIF'); const exifData = extractExifData(buffer, file.type); console.timeEnd('[Upload] EXIF');
 
     // 生成BlurHash和Dominant Color（渐进加载用）
-    const { blurHash, dominantColor } = await processImage(buffer);
+    console.time('[Upload] BlurHash'); const { blurHash, dominantColor } = await processImage(buffer); console.timeEnd('[Upload] BlurHash');
 
     // 验证EXIF数据是否存在（开发环境可选跳过）
     const skipExifCheck = process.env.NODE_ENV === 'development';
@@ -429,7 +429,7 @@ export async function POST(request: NextRequest) {
 
     // 检测重复上传（需要用户已有 embedding 的图片）
     console.log('[Upload] Checking for duplicate uploads...');
-    const duplicateCheck = await checkDuplicateUpload(userId, file);
+    console.time('[Upload] Embedding'); const duplicateCheck = await checkDuplicateUpload(userId, file); console.timeEnd('[Upload] Embedding');
 
     if (duplicateCheck.isDuplicate) {
       const similar = duplicateCheck.similarImages[0];
@@ -450,9 +450,9 @@ export async function POST(request: NextRequest) {
     let uploadResult;
     if (isDemoMode) {
       console.log('[DEMO MODE] Uploading to local storage...');
-      uploadResult = await demoUpload(buffer, userId, file.name);
+      console.time('[Upload] File upload'); uploadResult = await demoUpload(buffer, userId, file.name); console.timeEnd('[Upload] File upload');
     } else {
-      uploadResult = await uploadImage(buffer, file.name, file.type, userId);
+      console.time('[Upload] File upload'); uploadResult = await uploadImage(buffer, file.name, file.type, userId); console.timeEnd('[Upload] File upload');
     }
 
     // 保存到数据库
@@ -493,7 +493,7 @@ export async function POST(request: NextRequest) {
     // 注意：语义搜索 embedding 在审核通过后生成
     // 审核通过时会调用 queueEmbeddingGeneration
 
-    return NextResponse.json({
+    console.timeEnd('[Upload] Total'); return NextResponse.json({
       success: true,
       image: {
         id: image.id,
@@ -510,7 +510,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Upload failed:', error);
-    return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
+    console.timeEnd('[Upload] Total'); return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
   }
 }
 
