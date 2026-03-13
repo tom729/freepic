@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import piexif from 'piexifjs';
-import { useAuthStore } from '@/stores/auth';
+import { useSession } from 'next-auth/react';
 import { LogIn, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -54,7 +54,9 @@ function bytesToString(bytes: unknown): string {
 
 
 export default function UploadPage() {
-  const { isAuthenticated, isLoading, init, token } = useAuthStore();
+  const { data: session, status } = useSession();
+  const isAuthenticated = !!session?.user;
+  const isLoading = status === 'loading';
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -91,13 +93,6 @@ export default function UploadPage() {
 
 
 
-  // 延迟初始化，确保 persist 中间件已经完成 rehydrate
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      init();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [init]);
   const extractExifData = useCallback((base64Image: string): { 
     hasExif: boolean; 
     data: ExifData;
@@ -346,7 +341,6 @@ export default function UploadPage() {
           });
 
           xhr.open('POST', '/api/upload');
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
           xhr.responseType = 'text';
           xhr.send(formData);
         });

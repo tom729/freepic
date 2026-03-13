@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { images, imageEmbeddings } from '@/lib/schema';
+import { images, imageEmbeddings, users } from '@/lib/schema';
 import { uploadImage } from '@/lib/cos';
 import { processImage } from '@/lib/image-processing';
 import { verifyAuthWithUser } from '@/lib/server-auth';
@@ -13,10 +13,35 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/next-auth';
 
 // 计算文件 MD5 哈希
 function calculateFileHash(buffer: Buffer): string {
   return crypto.createHash('md5').update(buffer).digest('hex');
+}
+
+
+// Helper to get user from either Bearer token or NextAuth session
+async function getUserFromRequest(request: NextRequest) {
+  // First try Bearer token
+  const { isAuthenticated, user } = await verifyAuthWithUser(request);
+  if (isAuthenticated && user) {
+    return { isAuthenticated: true, user };
+  }
+  
+  // Try NextAuth session
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.email, session.user.email!),
+    });
+    if (dbUser) {
+      return { isAuthenticated: true, user: dbUser };
+    }
+  }
+  
+  return { isAuthenticated: false, user: null };
 }
 
 // 基于文件哈希的重复检测（快速预检）
