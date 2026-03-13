@@ -79,7 +79,44 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Handle OAuth callback
+  // Handle OAuth session changes
+  useEffect(() => {
+    let mounted = true;
+    
+    const initSession = async () => {
+      try {
+        const { useSession } = await import('next-auth/react');
+        const { data: session, status } = useSession();
+        
+        if (status === 'authenticated' && session?.user && mounted) {
+          console.log('[Login] OAuth session detected, logging in user:', session.user.email);
+          const user = {
+            id: session.user.id as string,
+            email: session.user.email as string,
+            name: session.user.name as string,
+            avatar: session.user.image as string,
+            createdAt: new Date().toISOString(),
+          };
+          setUser(user, 'oauth-token');
+          router.push('/');
+        }
+      } catch (e) {
+        console.error('[Login] Session check error:', e);
+      }
+    };
+    
+    initSession();
+    
+    // Set up interval to check for session changes (OAuth redirect)
+    const interval = setInterval(() => {
+      initSession();
+    }, 1000);
+    
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [setUser, router]);
   useEffect(() => {
     // Check for OAuth callback
     const checkOAuth = async () => {
