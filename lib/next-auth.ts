@@ -125,6 +125,4 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET,
   debug: process.env.NODE_ENV === 'development',
 };
-  trustHost: true,
-  debug: process.env.NODE_ENV === 'development',
-};
+
