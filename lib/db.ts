@@ -5,6 +5,17 @@ import * as schema from './schema';
 // Supabase PostgreSQL connection with retry logic
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: 5,
+  min: 1,
+  idleTimeoutMillis: 60000,
+  connectionTimeoutMillis: 10000,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  allowExitOnIdle: false,
+  family: 4,
+});
+  connectionString: process.env.DATABASE_URL,
   max: 5, // Reduce max connections for Supabase free tier
   min: 1, // Keep minimum 1 connection
   idleTimeoutMillis: 60000, // Increase idle timeout
