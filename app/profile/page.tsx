@@ -45,6 +45,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [activeTab, setActiveTab] = useState<'approved' | 'pending'>('approved');
 
   // 编辑表单状态
   const [editForm, setEditForm] = useState({
@@ -56,9 +57,16 @@ export default function ProfilePage() {
     twitter: '',
   });
 
+  // 按状态筛选图片
+  const approvedImages = uploads.filter(img => img.status === 'approved');
+  const pendingImages = uploads.filter(img => img.status === 'pending');
+  const displayImages = activeTab === 'approved' ? approvedImages : pendingImages;
+
   // 计算统计数据
   const stats = {
     totalUploads: uploads.length,
+    approvedCount: approvedImages.length,
+    pendingCount: pendingImages.length,
     totalDownloads: uploads.reduce((sum, img) => sum + (img.downloads || 0), 0),
   };
 
@@ -307,11 +315,40 @@ export default function ProfilePage() {
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm overflow-hidden">
           <div className="border-b border-gray-200">
             <nav className="flex">
-              <div className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600">
+              <button
+                onClick={() => setActiveTab('approved')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'approved'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
                 <Upload className="h-4 w-4" />
-                <span className="hidden sm:inline">我的上传</span>
-                <span className="sm:hidden">上传</span>
-              </div>
+                <span className="hidden sm:inline">已审核</span>
+                <span className="sm:hidden">已审核</span>
+                {stats.approvedCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-600 rounded-full">
+                    {stats.approvedCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'pending'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">待审核</span>
+                <span className="sm:hidden">待审核</span>
+                {stats.pendingCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-600 rounded-full">
+                    {stats.pendingCount}
+                  </span>
+                )}
+              </button>
             </nav>
           </div>
 
@@ -331,9 +368,16 @@ export default function ProfilePage() {
                   去上传
                 </a>
               </div>
+            ) : displayImages.length === 0 ? (
+              <div className="text-center py-12">
+                <Upload className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                <p className="text-gray-500 text-sm sm:text-base">
+                  {activeTab === 'approved' ? '还没有已审核的图片' : '暂无待审核的图片'}
+                </p>
+              </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-                {uploads.map((image) => (
+                {displayImages.map((image) => (
                   <ImageCard
                     key={image.id}
                     image={image}

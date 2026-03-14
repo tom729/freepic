@@ -21,6 +21,7 @@ export interface ImageItem {
   // Progressive loading fields
   blurHash?: string;
   dominantColor?: string;
+  status?: 'pending' | 'approved' | 'rejected';
 }
 
 interface ImageCardProps {
