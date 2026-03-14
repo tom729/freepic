@@ -1,8 +1,20 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { ImageCard, ImageItem } from '@/components/ImageCard';
-import { LogOut, Loader2, ImageIcon, Download, Edit3, X, MapPin, Instagram, Twitter, Globe, Upload } from 'lucide-react';
+import {
+  LogOut,
+  Loader2,
+  ImageIcon,
+  Download,
+  Edit3,
+  X,
+  MapPin,
+  Instagram,
+  Twitter,
+  Globe,
+  Upload,
+} from 'lucide-react';
 import { AvatarUpload } from '@/components/AvatarUpload';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -26,7 +38,6 @@ export default function ProfilePage() {
   const isAuthenticated = !!session?.user;
   const isAuthLoading = status === 'loading';
   const user = session?.user;
-  const token = null;
   const logout = () => signOut({ callbackUrl: '/' });
   const updateUser = () => {};
   const [uploads, setUploads] = useState<ImageItem[]>([]);
@@ -34,7 +45,6 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-
 
   // 编辑表单状态
   const [editForm, setEditForm] = useState({
@@ -62,18 +72,17 @@ export default function ProfilePage() {
 
   // 加载数据
   useEffect(() => {
-    if (isAuthenticated && token && !isAuthLoading) {
+    if (isAuthenticated && !isAuthLoading) {
       loadProfile();
       loadUploads();
     }
-  }, [isAuthenticated, token, isAuthLoading]);
+  }, [isAuthenticated, isAuthLoading]);
 
   // 加载用户资料
   const loadProfile = async () => {
-    if (!token) return;
     try {
       const response = await fetch('/api/users/me', {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
@@ -94,11 +103,10 @@ export default function ProfilePage() {
 
   // 加载用户上传的图片
   const loadUploads = async () => {
-    if (!token) return;
     setIsLoading(true);
     try {
       const response = await fetch('/api/users/me/uploads', {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
@@ -111,16 +119,14 @@ export default function ProfilePage() {
     }
   };
 
-
   // 保存资料
   const handleSaveProfile = async () => {
-    if (!token) return;
     try {
       const response = await fetch('/api/users/me', {
         method: 'PUT',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(editForm),
       });
@@ -137,8 +143,6 @@ export default function ProfilePage() {
     }
   };
 
-
-
   const handleLogout = () => {
     logout();
     router.push('/');
@@ -148,7 +152,7 @@ export default function ProfilePage() {
     try {
       const response = await fetch(`/api/images/${image.id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (response.ok) {
         setUploads((prev) => prev.filter((img) => img.id !== image.id));
@@ -172,7 +176,6 @@ export default function ProfilePage() {
   };
 
   // 等待 auth store 恢复或用户未登录
-  // 等待 auth store 恢复或用户未登录
   if (isAuthLoading || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -188,7 +191,6 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* User Info Card */}
-        {/* User Info Card */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-8 mb-4 sm:mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             {/* Avatar Upload */}
@@ -200,12 +202,12 @@ export default function ProfilePage() {
                 formData.append('avatar', file);
                 const response = await fetch('/api/users/me/avatar', {
                   method: 'POST',
-                  headers: { Authorization: `Bearer ${token}` },
+                  credentials: 'include',
                   body: formData,
                 });
                 if (response.ok) {
                   const data = await response.json();
-                  setProfile((prev) => prev ? { ...prev, avatar: data.avatarUrl } : null);
+                  setProfile((prev) => (prev ? { ...prev, avatar: data.avatarUrl } : null));
                 } else {
                   const error = await response.json();
                   alert(error.error || '头像上传失败');
@@ -227,12 +229,10 @@ export default function ProfilePage() {
                   编辑资料
                 </button>
               </div>
-              
+
               <p className="text-gray-500 text-sm mb-2">{displayEmail}</p>
-              
-              {profile?.bio && (
-                <p className="text-gray-700 text-sm mb-3 max-w-xl">{profile.bio}</p>
-              )}
+
+              {profile?.bio && <p className="text-gray-700 text-sm mb-3 max-w-xl">{profile.bio}</p>}
 
               {/* Social Links */}
               <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -244,7 +244,11 @@ export default function ProfilePage() {
                 )}
                 {profile?.website && (
                   <a
-                    href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
+                    href={
+                      profile.website.startsWith('http')
+                        ? profile.website
+                        : `https://${profile.website}`
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700"
@@ -260,8 +264,7 @@ export default function ProfilePage() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 text-pink-600 hover:text-pink-700"
                   >
-                    <Instagram className="h-4 w-4" />
-                    @{profile.instagram}
+                    <Instagram className="h-4 w-4" />@{profile.instagram}
                   </a>
                 )}
                 {profile?.twitter && (
@@ -271,8 +274,7 @@ export default function ProfilePage() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 text-blue-500 hover:text-blue-600"
                   >
-                    <Twitter className="h-4 w-4" />
-                    @{profile.twitter}
+                    <Twitter className="h-4 w-4" />@{profile.twitter}
                   </a>
                 )}
               </div>
@@ -414,7 +416,9 @@ export default function ProfilePage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                      @
+                    </span>
                     <input
                       type="text"
                       value={editForm.instagram}
@@ -426,15 +430,19 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Twitter / X</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Twitter / X
+                  </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                      @
+                    </span>
                     <input
                       type="text"
                       value={editForm.twitter}
                       onChange={(e) => setEditForm({ ...editForm, twitter: e.target.value })}
                       placeholder="username"
-className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                   </div>
                 </div>
