@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     if (!adminCheck.isAdmin) {
       return NextResponse.json({ error: adminCheck.error }, { status: adminCheck.status });
     }
+
 const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
     const page = parseInt(searchParams.get('page') || '1');

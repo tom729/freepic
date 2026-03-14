@@ -19,7 +19,7 @@ interface Image {
   createdAt: string;
   user: {
     id: string;
-    phone: string;
+    email: string;
   } | null;
 }
 
@@ -269,7 +269,7 @@ export default function ModerationPage() {
                       <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
                         <p>
                           <span className="text-gray-400">上传者: </span>
-                          {image.user?.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') || '未知'}
+                          {image.user?.email?.replace(/(@.*)/, '***$1') || '未知'}
                         </p>
                         <p>
                           <span className="text-gray-400">尺寸: </span>
