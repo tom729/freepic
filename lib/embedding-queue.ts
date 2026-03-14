@@ -72,6 +72,8 @@ async function processQueue(): Promise<void> {
         if (!url) {
           throw new Error('No URL or cosKey provided');
         }
+        
+        console.log(`[EmbeddingQueue] Processing image ${item.imageId}, URL: ${url}`);
         await generateAndSaveEmbedding(item.imageId, url);
         success = true;
         
