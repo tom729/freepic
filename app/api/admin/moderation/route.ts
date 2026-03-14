@@ -85,18 +85,40 @@ const { searchParams } = new URL(request.url);
       .limit(limit)
 .offset(offset);
 
-    // Generate URLs for each image
+    // Generate URLs for each image - use same logic as main images API
     const imagesWithUrls = await Promise.all(
       imagesList.map(async (img) => {
-        let url = '';
+        let urls = {
+          thumbnailUrl: '',
+          smallUrl: '',
+          regularUrl: '',
+          fullUrl: '',
+        };
         try {
           if (img.cosKey) {
-            url = await getImageUrl(img.cosKey, { expires: 86400 });
+            const baseUrl = await getImageUrl(img.cosKey, { expires: 86400 });
+            const isCustomDomain = !baseUrl.includes('myqcloud.com');
+            if (isCustomDomain) {
+              urls = {
+                thumbnailUrl: `${baseUrl}/thumb`,
+                smallUrl: `${baseUrl}/small`,
+                regularUrl: `${baseUrl}/regular`,
+                fullUrl: `${baseUrl}/full`,
+              };
+            } else {
+              const separator = baseUrl.includes('?') ? '&' : '?';
+              urls = {
+                thumbnailUrl: `${baseUrl}${separator}imageMogr2/style/thumb`,
+                smallUrl: `${baseUrl}${separator}imageMogr2/style/small`,
+                regularUrl: `${baseUrl}${separator}imageMogr2/style/regular`,
+                fullUrl: `${baseUrl}${separator}imageMogr2/style/full`,
+              };
+            }
           }
         } catch (e) {
           console.error('Failed to generate URL', e);
         }
-        return { ...img, url };
+        return { ...img, ...urls };
       })
     );
 

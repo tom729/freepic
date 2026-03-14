@@ -7,6 +7,10 @@ import Link from 'next/link';
 interface Image {
   id: string;
   cosKey: string;
+  thumbnailUrl: string;
+  smallUrl: string;
+  regularUrl: string;
+  fullUrl: string;
   status: 'pending' | 'approved' | 'rejected';
   width: number;
   height: number;
@@ -245,7 +249,7 @@ export default function ModerationPage() {
                     {/* Image Preview */}
                     <div className="aspect-video bg-gray-100 relative group">
                       <img
-                        src={image.url || getImageUrl(image.cosKey)}
+                        src={image.thumbnailUrl || getImageUrl(image.cosKey)}
                         alt="待审核图片"
                         className="w-full h-full object-cover"
                       />
