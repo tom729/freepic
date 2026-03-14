@@ -397,66 +397,41 @@ export async function POST(request: NextRequest) {
     const fileHash = calculateFileHash(buffer);
     console.log(`[Upload] File hash: ${fileHash}`);
 
-    // 基于文件哈希的快速重复检测（100% 准确）
-    const hashCheck = await checkDuplicateByHash(userId, fileHash);
-    if (hashCheck.isDuplicate) {
-      return NextResponse.json(
-        {
-          error: '文件已存在',
-          details: '您已经上传过完全相同的文件',
-          existingImage: hashCheck.existingImage,
-        },
-        { status: 409 } // Conflict
-      );
-    }
+    // 跳过重复检测以加快上传速度
+    // const hashCheck = await checkDuplicateByHash(userId, fileHash);
+    // if (hashCheck.isDuplicate) {
+    //   return NextResponse.json(
+    //     {
+    //       error: '文件已存在',
+    //       details: '您已经上传过完全相同的文件',
+    //       existingImage: hashCheck.existingImage,
+    //     },
+    //     { status: 409 } // Conflict
+    //   );
+    // }
 
-    // 提取EXIF数据
-
-    // 提取EXIF数据
-    const exifData = extractExifData(buffer, file.type);
-
-    // 后台处理：生成BlurHash、上传COS、触发审核
-
-    // 验证EXIF数据是否存在（开发环境可选跳过）
-    const skipExifCheck = process.env.NODE_ENV === 'development';
-    if (!skipExifCheck && !exifData.camera && !exifData.dateTaken) {
-      return NextResponse.json(
-        { error: '该图片缺少EXIF信息，请使用相机原图上传' },
-        { status: 400 }
-      );
-    }
     // 生成图片ID
     const imageId = uuidv4();
 
-    // 先保存到数据库，状态为 pending
+    // 先保存到数据库，状态为 pending，EXIF数据留空，等待后台处理
     await db
       .insert(images)
       .values({
         id: imageId,
         userId,
         cosKey: '', // 将在后台处理完成后更新
-        exifData: {
-          camera: exifData.camera,
-          cameraMake: exifData.cameraMake,
-          cameraModel: exifData.cameraModel,
-          dateTaken: exifData.dateTaken,
-          iso: exifData.iso,
-          aperture: exifData.aperture,
-          shutterSpeed: exifData.shutterSpeed,
-          gps: exifData.gps,
-        },
-        width: exifData.width,
-        height: exifData.height,
+        exifData: {}, // 空对象，等待后台处理填充
+        width: null,
+        height: null,
         fileSize: file.size,
         fileHash, // MD5 hash for duplicate detection
         blurHash: null, // 将在后台处理完成后更新
         dominantColor: null, // 将在后台处理完成后更新
         description: description || null,
-        location: exifData.gps?.formatted || null,
+        location: null, // 将在后台处理完成后更新
         status: 'pending', // 初始状态为 pending
         createdAt: new Date(),
       });
-
     // 立即返回成功响应
     const response = NextResponse.json({
       success: true,
@@ -502,7 +477,7 @@ async function triggerModeration(imageId: string, imageUrl: string) {
   }
 }
 
-// 后台异步处理图片：生成BlurHash、上传到COS、触发审核
+// 后台异步处理图片：提取EXIF、验证、生成BlurHash、上传到COS、触发审核
 async function processImageAsync(
   imageId: string,
   buffer: Buffer,
@@ -513,11 +488,31 @@ async function processImageAsync(
   try {
     console.log(`[Upload] Starting background processing for image ${imageId}`);
 
-    // 1. 生成 BlurHash 和 Dominant Color
+    // 1. 提取EXIF数据
+    const exifData = extractExifData(buffer, mimeType);
+    console.log(`[Upload] Extracted EXIF for image ${imageId}:`, {
+      camera: exifData.camera,
+      dateTaken: exifData.dateTaken,
+    });
+
+    // 2. 验证EXIF数据
+    const skipExifCheck = process.env.NODE_ENV === 'development';
+    if (!skipExifCheck && !exifData.camera && !exifData.dateTaken) {
+      console.warn(`[Upload] Image ${imageId} rejected: missing EXIF data`);
+      await db
+        .update(images)
+        .set({
+          status: 'rejected',
+        })
+        .where(eq(images.id, imageId));
+      return;
+    }
+
+    // 3. 生成 BlurHash 和 Dominant Color
     const { blurHash, dominantColor } = await processImage(buffer);
     console.log(`[Upload] Generated blurHash for image ${imageId}`);
 
-    // 2. 上传文件到 COS（演示模式或 COS）
+    // 4. 上传文件到 COS（演示模式或 COS）
     let uploadResult;
     if (isDemoMode) {
       console.log('[DEMO MODE] Uploading to local storage...');
@@ -527,19 +522,32 @@ async function processImageAsync(
     }
     console.log(`[Upload] File uploaded to ${uploadResult.key}`);
 
-    // 3. 更新数据库记录
+    // 5. 更新数据库记录
     await db
       .update(images)
       .set({
         cosKey: uploadResult.key,
+        exifData: {
+          camera: exifData.camera,
+          cameraMake: exifData.cameraMake,
+          cameraModel: exifData.cameraModel,
+          dateTaken: exifData.dateTaken,
+          iso: exifData.iso,
+          aperture: exifData.aperture,
+          shutterSpeed: exifData.shutterSpeed,
+          gps: exifData.gps,
+        },
+        width: exifData.width,
+        height: exifData.height,
         blurHash,
         dominantColor,
+        location: exifData.gps?.formatted || null,
         status: 'approved',
       })
       .where(eq(images.id, imageId));
     console.log(`[Upload] Database updated for image ${imageId}`);
 
-    // 4. 触发内容审核
+    // 6. 触发内容审核
     triggerModeration(imageId, uploadResult.url).catch((err) => {
       console.error('[Upload] Moderation trigger failed:', err);
     });

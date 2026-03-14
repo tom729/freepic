@@ -1,20 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { images } from '@/lib/schema';
+import { images, users } from '@/lib/schema';
 import { eq, desc } from 'drizzle-orm';
-import { verifyAuthWithUser } from '@/lib/server-auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/next-auth';
 import { getImageUrl } from '@/lib/cos';
+import { verifyAuthWithUser } from '@/lib/server-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    // 验证用户身份
-    const { isAuthenticated, user, userId } = await verifyAuthWithUser(request);
+    // 验证用户身份 - 支持 Bearer token 和 NextAuth session
+    let userId: string | undefined;
+    
+    // 先尝试 Bearer token
+    const { isAuthenticated, userId: tokenUserId } = await verifyAuthWithUser(request);
+    if (isAuthenticated && tokenUserId) {
+      userId = tokenUserId;
+    }
+    
+    // 如果没有 token，尝试 NextAuth session
+    if (!userId) {
+      const session = await getServerSession(authOptions);
+      if (session?.user?.email) {
+        const dbUser = await db.query.users.findFirst({
+          where: (users, { eq }) => eq(users.email, session.user.email!),
+        });
+        if (dbUser) {
+          userId = dbUser.id;
+        }
+      }
+    }
 
-    if (!isAuthenticated || !userId) {
+    if (!userId) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 });
     }
+
+    // 获取用户信息
+    const user = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.id, userId),
+    });
+
+
 
     // 获取用户显示名称
     const authorName = user?.name || user?.email?.split('@')[0] || '我';
