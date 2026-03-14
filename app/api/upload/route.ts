@@ -415,8 +415,7 @@ export async function POST(request: NextRequest) {
     // 提取EXIF数据
     const exifData = extractExifData(buffer, file.type);
 
-    // 生成BlurHash和Dominant Color（渐进加载用）
-    const { blurHash, dominantColor } = await processImage(buffer);
+    // 后台处理：生成BlurHash、上传COS、触发审核
 
     // 验证EXIF数据是否存在（开发环境可选跳过）
     const skipExifCheck = process.env.NODE_ENV === 'development';
@@ -426,27 +425,16 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // 生成图片ID
+    const imageId = uuidv4();
 
-
-    // 跳过同步 embedding 检测（太慢），改用后台异步处理
-    // 上传后会自动通过 queueEmbeddingGeneration 生成 embedding
-
-    // 上传文件（演示模式或 COS）
-    let uploadResult;
-    if (isDemoMode) {
-      console.log('[DEMO MODE] Uploading to local storage...');
-      uploadResult = await demoUpload(buffer, userId, file.name);
-    } else {
-      uploadResult = await uploadImage(buffer, file.name, file.type, userId);
-    }
-
-    // 保存到数据库
-    const [image] = await db
+    // 先保存到数据库，状态为 pending
+    await db
       .insert(images)
       .values({
-        id: uuidv4(),
+        id: imageId,
         userId,
-        cosKey: uploadResult.key,
+        cosKey: '', // 将在后台处理完成后更新
         exifData: {
           camera: exifData.camera,
           cameraMake: exifData.cameraMake,
@@ -461,38 +449,30 @@ export async function POST(request: NextRequest) {
         height: exifData.height,
         fileSize: file.size,
         fileHash, // MD5 hash for duplicate detection
-        blurHash, // Progressive loading: blur placeholder
-        dominantColor, // Progressive loading: dominant color
+        blurHash: null, // 将在后台处理完成后更新
+        dominantColor: null, // 将在后台处理完成后更新
         description: description || null,
         location: exifData.gps?.formatted || null,
+        status: 'pending', // 初始状态为 pending
         createdAt: new Date(),
-      })
-      .returning();
+      });
 
-
-    // 异步触发内容审核（不等待结果）
-    triggerModeration(image.id, uploadResult.url).catch((err) => {
-      console.error('触发审核失败:', err);
-    });
-
-    // 注意：语义搜索 embedding 在审核通过后生成
-    // 审核通过时会调用 queueEmbeddingGeneration
-
-    return NextResponse.json({
+    // 立即返回成功响应
+    const response = NextResponse.json({
       success: true,
       image: {
-        id: image.id,
-        cosKey: image.cosKey,
-        status: image.status,
-        url: uploadResult.url,
-        width: image.width,
-        height: image.height,
-        blurHash: image.blurHash,
-        dominantColor: image.dominantColor,
-        description: image.description,
-        location: image.location,
+        id: imageId,
+        status: 'pending',
+        message: '图片已接收，正在后台处理中',
       },
     });
+
+    // 触发后台处理（不等待完成）
+    processImageAsync(imageId, buffer, file.name, file.type, userId).catch((err) => {
+      console.error('[Upload] Background processing failed:', err);
+    });
+
+    return response;
   } catch (error) {
     console.error('Upload failed:', error);
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
@@ -519,5 +499,63 @@ async function triggerModeration(imageId: string, imageUrl: string) {
     console.log('内容审核结果:', result);
   } catch (error) {
     console.error('内容审核触发失败:', error);
+  }
+}
+
+// 后台异步处理图片：生成BlurHash、上传到COS、触发审核
+async function processImageAsync(
+  imageId: string,
+  buffer: Buffer,
+  filename: string,
+  mimeType: string,
+  userId: string
+) {
+  try {
+    console.log(`[Upload] Starting background processing for image ${imageId}`);
+
+    // 1. 生成 BlurHash 和 Dominant Color
+    const { blurHash, dominantColor } = await processImage(buffer);
+    console.log(`[Upload] Generated blurHash for image ${imageId}`);
+
+    // 2. 上传文件到 COS（演示模式或 COS）
+    let uploadResult;
+    if (isDemoMode) {
+      console.log('[DEMO MODE] Uploading to local storage...');
+      uploadResult = await demoUpload(buffer, userId, filename);
+    } else {
+      uploadResult = await uploadImage(buffer, filename, mimeType, userId);
+    }
+    console.log(`[Upload] File uploaded to ${uploadResult.key}`);
+
+    // 3. 更新数据库记录
+    await db
+      .update(images)
+      .set({
+        cosKey: uploadResult.key,
+        blurHash,
+        dominantColor,
+        status: 'approved',
+      })
+      .where(eq(images.id, imageId));
+    console.log(`[Upload] Database updated for image ${imageId}`);
+
+    // 4. 触发内容审核
+    triggerModeration(imageId, uploadResult.url).catch((err) => {
+      console.error('[Upload] Moderation trigger failed:', err);
+    });
+
+    console.log(`[Upload] Background processing completed for image ${imageId}`);
+  } catch (error) {
+    console.error(`[Upload] Background processing failed for image ${imageId}:`, error);
+    // 更新数据库状态为失败
+    await db
+      .update(images)
+      .set({
+        status: 'rejected',
+      })
+      .where(eq(images.id, imageId))
+      .catch((err) => {
+        console.error('[Upload] Failed to update error status:', err);
+      });
   }
 }
