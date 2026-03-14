@@ -19,6 +19,7 @@ async function getFeaturedPhotographers(): Promise<Photographer[]> {
       })
       .from(users)
       .leftJoin(images, eq(users.id, images.userId))
+      .where(eq(images.status, 'approved'))
       .groupBy(users.id)
       .orderBy(desc(sql`count(${images.id})`))
       .limit(4);
