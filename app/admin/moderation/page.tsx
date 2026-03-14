@@ -28,9 +28,11 @@ export default function ModerationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchImages = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const response = await fetch(`/api/admin/moderation?status=${activeTab}`, {
         credentials: 'include',
@@ -38,9 +40,13 @@ export default function ModerationPage() {
       if (response.ok) {
         const data = await response.json();
         setImages(data.images || []);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || '加载失败');
       }
     } catch (error) {
       console.error('Failed to fetch images:', error);
+      setError('网络错误');
     } finally {
       setIsLoading(false);
     }
@@ -210,6 +216,11 @@ export default function ModerationPage() {
 
           {/* Content */}
           <div className="p-3 sm:p-6">
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
