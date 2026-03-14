@@ -3,20 +3,42 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { verifyAuth } from '@/lib/server-auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/next-auth';
 
 export const dynamic = 'force-dynamic';
+
+// Helper to get user ID from either Bearer token or NextAuth session
+async function getUserId(request: NextRequest): Promise<string | null> {
+  // First try Bearer token
+  const auth = await verifyAuth(request);
+  if (auth.isAuthenticated && auth.userId) {
+    return auth.userId;
+  }
+
+  // Try NextAuth session
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const user = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.email, session.user.email!),
+    });
+    return user?.id || null;
+  }
+
+  return null;
+}
 
 // GET /api/users/me - 获取当前用户信息
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAuth(request);
+    const userId = await getUserId(request);
 
-    if (!auth.isAuthenticated || !auth.userId) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await db.query.users.findFirst({
-      where: eq(users.id, auth.userId),
+      where: eq(users.id, userId),
       columns: {
         id: true,
         email: true,
@@ -45,9 +67,9 @@ export async function GET(request: NextRequest) {
 // PUT /api/users/me - 更新当前用户信息
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await verifyAuth(request);
+    const userId = await getUserId(request);
 
-    if (!auth.isAuthenticated || !auth.userId) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -96,11 +118,11 @@ export async function PUT(request: NextRequest) {
         twitter: cleanTwitter || null,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, auth.userId));
+      .where(eq(users.id, userId));
 
     // 获取更新后的用户信息
     const updatedUser = await db.query.users.findFirst({
-      where: eq(users.id, auth.userId),
+      where: eq(users.id, userId),
       columns: {
         id: true,
         email: true,

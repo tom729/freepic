@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ImageCard, ImageItem } from '@/components/ImageCard';
 import { LogOut, Loader2, ImageIcon, Download, Edit3, X, MapPin, Instagram, Twitter, Globe, Upload } from 'lucide-react';
 import { AvatarUpload } from '@/components/AvatarUpload';
-import { useAuthStore } from '@/stores/auth';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 interface UserProfile {
@@ -22,7 +22,13 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isAuthenticated, logout, token, updateUser, isLoading: isAuthLoading } = useAuthStore();
+  const { data: session, status } = useSession();
+  const isAuthenticated = !!session?.user;
+  const isAuthLoading = status === 'loading';
+  const user = session?.user;
+  const token = null;
+  const logout = () => signOut({ callbackUrl: '/' });
+  const updateUser = () => {};
   const [uploads, setUploads] = useState<ImageItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -200,8 +206,6 @@ export default function ProfilePage() {
                 if (response.ok) {
                   const data = await response.json();
                   setProfile((prev) => prev ? { ...prev, avatar: data.avatarUrl } : null);
-                  // 同时更新 auth store，防止刷新后恢复旧头像
-                  updateUser({ avatar: data.avatarUrl });
                 } else {
                   const error = await response.json();
                   alert(error.error || '头像上传失败');
