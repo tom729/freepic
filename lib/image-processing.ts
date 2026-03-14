@@ -87,22 +87,65 @@ export async function getImageDimensions(
  * @param buffer - Image buffer
  * @returns Processing result with metadata
  */
+
+// 大文件阈值（超过此大小跳过内存密集型处理）
+const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10MB
+
+/**
+ * 优化版图片处理 - 减少内存占用
+ * 对于大文件跳过blurHash生成，避免OOM
+ */
 export async function processImage(buffer: Buffer) {
   try {
-    const [blurHash, dominantColor, dimensions] = await Promise.all([
-      generateBlurHash(buffer),
-      extractDominantColor(buffer),
-      getImageDimensions(buffer),
-    ]);
+    // 大文件跳过 blurHash 和 dominant color（太耗内存）
+    if (buffer.length > LARGE_FILE_THRESHOLD) {
+      console.log(`[ImageProcessing] Large file (${(buffer.length / 1024 / 1024).toFixed(1)}MB), skipping blurHash`);
+      const metadata = await sharp(buffer).metadata();
+      return {
+        blurHash: null,
+        dominantColor: null,
+        width: metadata.width || null,
+        height: metadata.height || null,
+      };
+    }
+
+    // 小文件：顺序处理而非并行，减少内存峰值
+    // 1. 先获取尺寸
+    const metadata = await sharp(buffer).metadata();
+
+    // 2. 提取主色调 - 调整到1x1
+    const dominantBuffer = await sharp(buffer)
+      .resize(1, 1, { fit: 'cover' })
+      .raw()
+      .toBuffer();
+    const r = dominantBuffer[0];
+    const g = dominantBuffer[1];
+    const b = dominantBuffer[2];
+    const dominantColor = `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
+
+    // 3. 生成blurHash - 调整到32x32
+    const blurHashData = await sharp(buffer)
+      .resize(32, 32, { fit: 'inside' })
+      .raw()
+      .ensureAlpha()
+      .toBuffer({ resolveWithObject: true });
+
+    const blurHash = encode(
+      new Uint8ClampedArray(blurHashData.data),
+      blurHashData.info.width,
+      blurHashData.info.height,
+      4,
+      3
+    );
 
     return {
       blurHash,
       dominantColor,
-      ...dimensions,
+      width: metadata.width || null,
+      height: metadata.height || null,
     };
   } catch (error) {
     console.error('Image processing failed:', error);
-    // Return null values but don't fail the upload
     return {
       blurHash: null,
       dominantColor: null,
