@@ -15,6 +15,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/next-auth';
+import { queueEmbeddingGeneration } from '@/lib/embedding-queue';
 
 // 计算文件 MD5 哈希
 function calculateFileHash(buffer: Buffer): string {
@@ -551,6 +552,14 @@ async function processImageAsync(
     triggerModeration(imageId, uploadResult.url).catch((err) => {
       console.error('[Upload] Moderation trigger failed:', err);
     });
+
+    // 7. 生成语义搜索 embedding（不等待结果）
+    try {
+      queueEmbeddingGeneration(imageId, uploadResult.url);
+      console.log(`[Upload] Queued embedding generation for image ${imageId}`);
+    } catch (err) {
+      console.error('[Upload] Failed to queue embedding:', err);
+    }
 
     console.log(`[Upload] Background processing completed for image ${imageId}`);
   } catch (error) {
