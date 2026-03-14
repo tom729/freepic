@@ -88,8 +88,9 @@ export async function getImageDimensions(
  * @returns Processing result with metadata
  */
 
-// 大文件阈值（超过此大小跳过内存密集型处理）
-const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10MB
+// 大文件阈值（超过此大小跳过所有内存密集型处理）
+// 为了避免OOM，降低阈值到5MB
+const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB
 
 /**
  * 优化版图片处理 - 减少内存占用
