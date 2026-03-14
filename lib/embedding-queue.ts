@@ -65,8 +65,9 @@ async function processQueue(): Promise<void> {
       try {
         // 如果有 cosKey，先生成长期 URL，否则使用传入的 URL
         let url = item.imageUrl || '';
+        // 如果有 cosKey，生成小图的长期 URL（原图有访问保护）
         if (item.cosKey) {
-          url = await getImageUrl(item.cosKey, { expires: 3600 }); // 1小时有效期
+          url = await getImageUrl(item.cosKey, { expires: 3600, size: 'small' }); // 使用小图
         }
         if (!url) {
           throw new Error('No URL or cosKey provided');

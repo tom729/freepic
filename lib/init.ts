@@ -4,6 +4,7 @@
  */
 
 import { startAutoEmbeddingCheck, getQueueStatus } from './embedding-queue';
+import { getImageUrl } from './cos';
 
 let isInitialized = false;
 let cleanupAutoCheck: (() => void) | null = null;
@@ -23,8 +24,11 @@ export function initializeServer(): void {
   try {
     cleanupAutoCheck = startAutoEmbeddingCheck(
       async (cosKey: string) => {
-        // Use the COS URL generation
-        return cosKey.startsWith('users/') ? `https://tukupic.mepai.me/${cosKey}` : `/${cosKey}`;
+        // 使用小图，因为原图有访问保护
+        if (cosKey.startsWith('users/')) {
+          return `https://tukupic.mepai.me/${cosKey}`;
+        }
+        return await getImageUrl(cosKey, { expires: 3600, size: 'small' });
       },
       60 * 60 * 1000 // 1 hour
     );

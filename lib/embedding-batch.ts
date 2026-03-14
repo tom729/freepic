@@ -3,6 +3,7 @@ import { imageEmbeddings, images } from './schema';
 import { generateImageEmbedding, serializeEmbedding } from './embedding';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { getImageUrl } from './cos';
 
 /**
  * Generate embeddings for all approved images that don't have one
@@ -48,10 +49,13 @@ export async function generateMissingEmbeddings(): Promise<{
           continue;
         }
 
-        // Build image URL
-        const imageUrl = image.cosKey.startsWith('users/')
-          ? `https://tukupic.mepai.me/${image.cosKey}`
-          : `/${image.cosKey}`;
+        // 生成图片 URL（使用小图，因为原图有访问保护）
+        let imageUrl = '';
+        if (image.cosKey.startsWith('users/')) {
+          imageUrl = `https://tukupic.mepai.me/${image.cosKey}`;
+        } else {
+          imageUrl = await getImageUrl(image.cosKey, { expires: 3600, size: 'small' });
+        }
 
         console.log(`[EmbeddingBatch] Processing: ${imageUrl}`);
 
