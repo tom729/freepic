@@ -26,7 +26,8 @@ export function initializeServer(): void {
       async (cosKey: string) => {
         // 使用小图，因为原图有访问保护
         if (cosKey.startsWith('users/')) {
-          return `https://tukupic.mepai.me/${cosKey}`;
+          // 自定义域名：添加 /small 后缀
+          return `https://tukupic.mepai.me/${cosKey}/small`;
         }
         return await getImageUrl(cosKey, { expires: 3600, size: 'small' });
       },
