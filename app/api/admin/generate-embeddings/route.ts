@@ -3,8 +3,35 @@ import { initializeServer, getBackgroundTaskStatus } from '@/lib/init';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMissingEmbeddings } from '@/lib/embedding-batch';
 import { verifyAuthWithUser } from '@/lib/server-auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/next-auth';
+import { db } from '@/lib/db';
+import { users } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
+
+// Helper to check admin (supports both Bearer token and NextAuth session)
+async function verifyAdmin(request: NextRequest) {
+  // Try Bearer token first
+  const { isAuthenticated, user } = await verifyAuthWithUser(request);
+  if (isAuthenticated && user?.isAdmin) {
+    return true;
+  }
+
+  // Try NextAuth session
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.email, session.user.email!),
+    });
+    if (dbUser?.isAdmin) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /**
  * Admin endpoint to generate embeddings for all images without them
@@ -18,9 +45,9 @@ export async function POST(request: NextRequest) {
     // Initialize server background tasks (safe to call multiple times)
     initializeServer();
 
-    // Verify admin authentication (optional - remove if you want public access)
-    const { isAuthenticated } = await verifyAuthWithUser(request);
-    if (!isAuthenticated) {
+    // Verify admin authentication
+    const isAdmin = await verifyAdmin(request);
+    if (!isAdmin) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 });
     }
     console.log('[Generate Embeddings] Starting batch process...');
@@ -46,8 +73,14 @@ export async function POST(request: NextRequest) {
 /**
  * GET endpoint to check embedding status
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Verify admin authentication
+    const isAdmin = await verifyAdmin(request);
+    if (!isAdmin) {
+      return NextResponse.json({ error: '请先登录' }, { status: 401 });
+    }
+
     // Initialize server background tasks (safe to call multiple times)
     initializeServer();
 
