@@ -555,7 +555,8 @@ async function processImageAsync(
 
     // 7. 生成语义搜索 embedding（不等待结果）
     try {
-      queueEmbeddingGeneration(imageId, uploadResult.url);
+      // 传递 cosKey，让 embedding 队列生成自己的长期 URL
+      queueEmbeddingGeneration(imageId, uploadResult.key);
       console.log(`[Upload] Queued embedding generation for image ${imageId}`);
     } catch (err) {
       console.error('[Upload] Failed to queue embedding:', err);

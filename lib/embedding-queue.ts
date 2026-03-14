@@ -9,8 +9,14 @@ import { eq } from 'drizzle-orm';
 import { generateImageEmbedding, serializeEmbedding } from './embedding';
 import { v4 as uuidv4 } from 'uuid';
 
+import { getImageUrl } from './cos';
+
 // Simple in-memory queue for processing embeddings
-const embeddingQueue: Array<{ imageId: string; imageUrl: string; retryCount?: number }> = [];
+// Accepts either cosKey (preferred) or imageUrl for backwards compatibility
+const embeddingQueue: Array<{ imageId: string; cosKey?: string; imageUrl?: string; retryCount?: number }> = [];
+// Track failed embeddings for debugging
+// Track failed embeddings for debugging
+
 let isProcessing = false;
 
 // Track failed embeddings for debugging
@@ -20,9 +26,16 @@ const MAX_FAILED_RECORDS = 100;
 /**
  * Add an image to the embedding generation queue
  */
-export function queueEmbeddingGeneration(imageId: string, imageUrl: string, retryCount = 0): void {
+export function queueEmbeddingGeneration(imageId: string, cosKeyOrUrl: string, retryCount = 0): void {
   console.log(`[EmbeddingQueue] Queued image ${imageId} (retry: ${retryCount})`);
-  embeddingQueue.push({ imageId, imageUrl, retryCount });
+  
+  // 判断是 cosKey 还是 URL
+  const isCosKey = !cosKeyOrUrl.startsWith('http');
+  const item = isCosKey 
+    ? { imageId, cosKey: cosKeyOrUrl, retryCount }
+    : { imageId, imageUrl: cosKeyOrUrl, retryCount };
+  
+  embeddingQueue.push(item);
 
   // Start processing if not already running
   if (!isProcessing) {
@@ -50,7 +63,15 @@ async function processQueue(): Promise<void> {
     // Try up to MAX_RETRIES times
     for (let attempt = 0; attempt < MAX_RETRIES && !success; attempt++) {
       try {
-        await generateAndSaveEmbedding(item.imageId, item.imageUrl);
+        // 如果有 cosKey，先生成长期 URL，否则使用传入的 URL
+        let url = item.imageUrl || '';
+        if (item.cosKey) {
+          url = await getImageUrl(item.cosKey, { expires: 3600 }); // 1小时有效期
+        }
+        if (!url) {
+          throw new Error('No URL or cosKey provided');
+        }
+        await generateAndSaveEmbedding(item.imageId, url);
         success = true;
         
         // Log success after retry
