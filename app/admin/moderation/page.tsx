@@ -32,7 +32,9 @@ export default function ModerationPage() {
   const fetchImages = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/moderation?status=${activeTab}`);
+      const response = await fetch(`/api/admin/moderation?status=${activeTab}`, {
+        credentials: 'include',
+      });
       if (response.ok) {
         const data = await response.json();
         setImages(data.images || []);
@@ -55,6 +57,7 @@ export default function ModerationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -77,6 +80,7 @@ export default function ModerationPage() {
     try {
       const response = await fetch(`/api/admin/moderation/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -105,6 +109,7 @@ export default function ModerationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject' }),
+        credentials: 'include',
       });
 
       if (response.ok) {

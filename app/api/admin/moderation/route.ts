@@ -5,20 +5,33 @@ import { db } from '@/lib/db';
 import { images, users } from '@/lib/schema';
 import { eq, desc } from 'drizzle-orm';
 import { verifyAuthWithUser } from '@/lib/server-auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/next-auth';
 
-// 验证管理员权限
+// 验证管理员权限（支持 Bearer token 和 NextAuth session）
 async function verifyAdmin(request: NextRequest) {
+  // 先尝试 Bearer token
   const { isAuthenticated, user } = await verifyAuthWithUser(request);
-  
-  if (!isAuthenticated) {
+  if (isAuthenticated && user?.isAdmin) {
+    return { isAdmin: true, user };
+  }
+
+  // 尝试 NextAuth session
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.email, session.user.email!),
+    });
+    if (dbUser?.isAdmin) {
+      return { isAdmin: true, user: dbUser };
+    }
+  }
+
+  if (!isAuthenticated && !session) {
     return { isAdmin: false, error: '请先登录', status: 401 };
   }
-  
-  if (!user?.isAdmin) {
-    return { isAdmin: false, error: '无管理员权限', status: 403 };
-  }
-  
-  return { isAdmin: true, user };
+
+  return { isAdmin: false, error: '无管理员权限', status: 403 };
 }
 
 // 获取待审核图片列表
