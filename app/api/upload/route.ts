@@ -350,7 +350,7 @@ function extractExifData(
 export async function POST(request: NextRequest) {
   try {
     // 验证用户身份并获取用户信息（包括激活状态）
-    const { isAuthenticated, user } = await verifyAuthWithUser(request);
+    const { isAuthenticated, user } = await getUserFromRequest(request);
 
     if (!isAuthenticated) {
       return NextResponse.json({ error: '请先登录后再上传图片' }, { status: 401 });
