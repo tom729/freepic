@@ -21,6 +21,7 @@ interface Image {
     id: string;
     email: string;
   } | null;
+  url: string;
 }
 
 export default function ModerationPage() {
@@ -244,7 +245,7 @@ export default function ModerationPage() {
                     {/* Image Preview */}
                     <div className="aspect-video bg-gray-100 relative group">
                       <img
-                        src={getImageUrl(image.cosKey)}
+                        src={image.url || getImageUrl(image.cosKey)}
                         alt="待审核图片"
                         className="w-full h-full object-cover"
                       />

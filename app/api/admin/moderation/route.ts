@@ -7,6 +7,7 @@ import { eq, desc } from 'drizzle-orm';
 import { verifyAuthWithUser } from '@/lib/server-auth';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/next-auth';
+import { getImageUrl } from '@/lib/cos';
 
 // 验证管理员权限（支持 Bearer token 和 NextAuth session）
 async function verifyAdmin(request: NextRequest) {
@@ -82,10 +83,25 @@ const { searchParams } = new URL(request.url);
       .where(eq(images.status, status as 'pending' | 'approved' | 'rejected'))
       .orderBy(desc(images.createdAt))
       .limit(limit)
-      .offset(offset);
+.offset(offset);
+
+    // Generate URLs for each image
+    const imagesWithUrls = await Promise.all(
+      imagesList.map(async (img) => {
+        let url = '';
+        try {
+          if (img.cosKey) {
+            url = await getImageUrl(img.cosKey, { expires: 86400 });
+          }
+        } catch (e) {
+          console.error('Failed to generate URL', e);
+        }
+        return { ...img, url };
+      })
+    );
 
     return NextResponse.json({
-      images: imagesList,
+      images: imagesWithUrls,
       pagination: {
         page,
         limit,
