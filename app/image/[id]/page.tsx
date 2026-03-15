@@ -4,6 +4,8 @@ import { Download, Camera, Calendar, MapPin, Instagram, Twitter, Globe, Eye } fr
 import { db } from '@/lib/db';
 import { images, users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/next-auth';
 import { ImageGrid } from '@/components/ImageGrid';
 import { DownloadButtons } from '@/components/DownloadButtons';
 import { getImageUrl } from '@/lib/cos';
@@ -121,7 +123,27 @@ export default async function ImagePage({ params }: ImagePageProps) {
     .limit(1)
     .then(results => results[0]);
 
-  if (!imageData || imageData.status !== 'approved') {
+  // 获取当前用户 session
+  const session = await getServerSession(authOptions);
+  const currentUserEmail = session?.user?.email;
+
+  // 检查是否是管理员
+  let isAdmin = false;
+  if (currentUserEmail) {
+    const currentUser = await db.query.users.findFirst({
+      where: eq(users.email, currentUserEmail),
+    });
+    isAdmin = currentUser?.isAdmin || false;
+  }
+
+  // 允许查看的条件：已批准 OR (是管理员) OR (是图片所有者)
+  const canView = imageData && (
+    imageData.status === 'approved' ||
+    isAdmin ||
+    (currentUserEmail && imageData.user?.email === currentUserEmail)
+  );
+
+  if (!canView) {
     notFound();
   }
 

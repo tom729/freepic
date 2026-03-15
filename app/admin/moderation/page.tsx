@@ -138,8 +138,8 @@ export default function ModerationPage() {
     if (cosKey.startsWith('uploads/')) {
       return `/${cosKey}`;
     }
-    // Mock images
-    return `https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400`;
+    // 使用自定义域名
+    return `https://tukupic.mepai.me/${cosKey}/small`;
   };
 
   const formatFileSize = (bytes: number) => {
