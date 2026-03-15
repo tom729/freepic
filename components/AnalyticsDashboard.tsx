@@ -32,7 +32,7 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
+import { useEffect } from 'react';
 interface StatsData {
   totalViews: number;
   totalDownloads: number;
@@ -44,9 +44,10 @@ interface StatsData {
   imagesChange: number;
   topImages: Array<{
     id: string;
-    url: string;
-    views: number;
+    cosKey: string;
+    likes: number;
     downloads: number;
+    description: string | null;
     author: string;
   }>;
   viewsOverTime: Array<{
@@ -58,43 +59,9 @@ interface StatsData {
     value: number;
   }>;
 }
-
 interface AnalyticsDashboardProps {
   className?: string;
 }
-const getMockData = (): StatsData => ({
-  totalViews: 15420,
-  totalDownloads: 3420,
-  totalUsers: 856,
-  totalImages: 1240,
-  viewsChange: 12.5,
-  downloadsChange: 8.3,
-  usersChange: -2.1,
-  imagesChange: 15.7,
-  topImages: [
-    { id: '1', url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=100', views: 1205, downloads: 156, author: 'user1' },
-    { id: '2', url: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=100', views: 892, downloads: 123, author: 'user2' },
-    { id: '3', url: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=100', views: 756, downloads: 98, author: 'user3' },
-    { id: '4', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=100', views: 643, downloads: 87, author: 'user4' },
-    { id: '5', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100', views: 521, downloads: 76, author: 'user5' },
-  ],
-  viewsOverTime: [
-    { date: '周一', views: 2340 },
-    { date: '周二', views: 2890 },
-    { date: '周三', views: 2156 },
-    { date: '周四', views: 3120 },
-    { date: '周五', views: 2890 },
-    { date: '周六', views: 3567 },
-    { date: '周日', views: 2457 },
-  ],
-  referrers: [
-    { name: '直接访问', value: 5234 },
-    { name: 'Google', value: 3456 },
-    { name: '社交媒体', value: 2345 },
-    { name: '外部链接', value: 1234 },
-    { name: '其他', value: 567 },
-  ],
-});
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
 
@@ -155,8 +122,47 @@ function StatCard({
 
 export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
   const [timeRange, setTimeRange] = useState('7d');
-  const [stats] = useState<StatsData>(getMockData());
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/admin/analytics', { credentials: 'include' });
+        if (!res.ok) {
+          throw new Error('Failed to fetch analytics');
+        }
+        const data = await res.json();
+        setStats(data);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch analytics:', err);
+        setError('加载统计数据失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [timeRange]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-neutral-500">加载中...</div>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-red-500">{error || '无法加载数据'}</div>
+      </div>
+    );
+  }
   return (
     <div className={cn('space-y-6', className)}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -292,8 +298,8 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
                 className="group relative aspect-square rounded-lg overflow-hidden"
               >
                 <img
-                  src={image.url}
-                  alt=""
+                  src={`https://tukupic.mepai.me/${image.cosKey}/small`}
+                  alt={image.description || ''}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
@@ -301,7 +307,7 @@ export function AnalyticsDashboard({ className }: AnalyticsDashboardProps) {
                   <p className="text-white text-sm font-medium">#{index + 1}</p>
                   <div className="flex items-center gap-3 text-white/80 text-xs mt-1">
                     <span className="flex items-center gap-1">
-                      <Eye className="h-3 w-3" /> {image.views}
+                      <TrendingUp className="h-3 w-3" /> {image.likes}
                     </span>
                     <span className="flex items-center gap-1">
                       <Download className="h-3 w-3" /> {image.downloads}

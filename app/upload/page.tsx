@@ -68,7 +68,7 @@ export default function UploadPage() {
     error?: string;
   }}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const fileIdCounterRef = useRef(0);
   // 计算总体上传进度
   const totalProgress = useMemo(() => {
     const files = Object.values(uploadProgress);
@@ -240,7 +240,7 @@ export default function UploadPage() {
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const id = `${Date.now()}-${i}`;
+        const id = `file-${Date.now()}-${++fileIdCounterRef.current}`;
         const result = await validateFile(file, id);
         newFiles.push(result);
       }
