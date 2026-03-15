@@ -135,6 +135,7 @@ export default function ModerationPage() {
   };
 
   const getImageUrl = (cosKey: string) => {
+    if (!cosKey) return '';
     if (cosKey.startsWith('uploads/')) {
       return `/${cosKey}`;
     }
@@ -248,11 +249,17 @@ export default function ModerationPage() {
                   >
                     {/* Image Preview */}
                     <div className="aspect-video bg-gray-100 relative group">
-                      <img
-                        src={image.thumbnailUrl || getImageUrl(image.cosKey)}
-                        alt="待审核图片"
-                        className="w-full h-full object-cover"
-                      />
+                      {image.cosKey ? (
+                        <img
+                          src={image.thumbnailUrl || getImageUrl(image.cosKey)}
+                          alt="待审核图片"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          无图片
+                        </div>
+                      )}
                       <Link
                         href={`/image/${image.id}`}
                         target="_blank"
