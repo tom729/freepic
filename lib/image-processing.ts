@@ -91,67 +91,73 @@ export async function getImageDimensions(
 // 大文件阈值（超过此大小跳过所有内存密集型处理）
 // 为了避免OOM，降低阈值到5MB
 const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB
+const MAX_DIMENSION = 2000; // 最大边长 2000px
+const COMPRESS_QUALITY = 85;
 
 /**
  * 优化版图片处理 - 减少内存占用
  * 对于大文件跳过blurHash生成，避免OOM
  */
 export async function processImage(buffer: Buffer) {
-  try {
-    // 大文件跳过 blurHash 和 dominant color（太耗内存）
-    if (buffer.length > LARGE_FILE_THRESHOLD) {
-      console.log(`[ImageProcessing] Large file (${(buffer.length / 1024 / 1024).toFixed(1)}MB), skipping blurHash`);
-      const metadata = await sharp(buffer).metadata();
+    // 先压缩大图以减少内存占用
+    // 先压缩大图以减少内存占用
+    let processingBuffer = buffer;
+    const metadata = await sharp(buffer).metadata();
+    const width = metadata.width || 0;
+    const height = metadata.height || 0;
+    
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+      console.log(`[ImageProcessing] Resizing large image (${width}x${height}) to max ${MAX_DIMENSION}px`);
+      processingBuffer = await sharp(buffer)
+        .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: COMPRESS_QUALITY })
+        .toBuffer();
+      console.log(`[ImageProcessing] Compressed from ${(buffer.length / 1024 / 1024).toFixed(1)}MB to ${(processingBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+    }
+    
+    // 使用压缩后的buffer进行处理（大幅减少内存占用）
+    try {
+      // 获取尺寸
+      const procMetadata = await sharp(processingBuffer).metadata();
+
+      // 提取主色调 - 调整到1x1
+      const dominantBuffer = await sharp(processingBuffer)
+        .resize(1, 1, { fit: 'cover' })
+        .raw()
+        .toBuffer();
+      const r = dominantBuffer[0];
+      const g = dominantBuffer[1];
+      const b = dominantBuffer[2];
+      const dominantColor = `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
+
+      // 生成blurHash - 调整到32x32
+      const blurHashData = await sharp(processingBuffer)
+        .resize(32, 32, { fit: 'inside' })
+        .raw()
+        .ensureAlpha()
+        .toBuffer({ resolveWithObject: true });
+
+      const blurHash = encode(
+        new Uint8ClampedArray(blurHashData.data),
+        blurHashData.info.width,
+        blurHashData.info.height,
+        4,
+        3
+      );
+
+      return {
+        blurHash,
+        dominantColor,
+        width: procMetadata.width || null,
+        height: procMetadata.height || null,
+      };
+    } catch (error) {
+      console.error('Image processing failed:', error);
       return {
         blurHash: null,
         dominantColor: null,
-        width: metadata.width || null,
-        height: metadata.height || null,
+        width: null,
+        height: null,
       };
     }
-
-    // 小文件：顺序处理而非并行，减少内存峰值
-    // 1. 先获取尺寸
-    const metadata = await sharp(buffer).metadata();
-
-    // 2. 提取主色调 - 调整到1x1
-    const dominantBuffer = await sharp(buffer)
-      .resize(1, 1, { fit: 'cover' })
-      .raw()
-      .toBuffer();
-    const r = dominantBuffer[0];
-    const g = dominantBuffer[1];
-    const b = dominantBuffer[2];
-    const dominantColor = `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
-
-    // 3. 生成blurHash - 调整到32x32
-    const blurHashData = await sharp(buffer)
-      .resize(32, 32, { fit: 'inside' })
-      .raw()
-      .ensureAlpha()
-      .toBuffer({ resolveWithObject: true });
-
-    const blurHash = encode(
-      new Uint8ClampedArray(blurHashData.data),
-      blurHashData.info.width,
-      blurHashData.info.height,
-      4,
-      3
-    );
-
-    return {
-      blurHash,
-      dominantColor,
-      width: metadata.width || null,
-      height: metadata.height || null,
-    };
-  } catch (error) {
-    console.error('Image processing failed:', error);
-    return {
-      blurHash: null,
-      dominantColor: null,
-      width: null,
-      height: null,
-    };
-  }
 }

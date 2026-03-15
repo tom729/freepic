@@ -608,3 +608,103 @@ export type ImageView = typeof imageViews.$inferSelect;
 export type NewImageView = typeof imageViews.$inferInsert;
 export type ImageViewAggregate = typeof imageViewAggregates.$inferSelect;
 export type NewImageViewAggregate = typeof imageViewAggregates.$inferInsert;
+
+// API Plans table
+export const apiPlans = pgTable(
+  'api_plans',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull().unique(),
+    description: text('description'),
+    dailyLimit: integer('daily_limit').default(100),
+    monthlyLimit: integer('monthly_limit'),
+    price: integer('price').default(0),
+    currency: text('currency').default('CNY'),
+    features: jsonb('features'),
+    isActive: boolean('is_active').default(true).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    slugIdx: index('api_plans_slug_idx').on(table.slug),
+  })
+);
+
+// API Keys table
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    planId: text('plan_id').references(() => apiPlans.id),
+    key: text('key').notNull().unique(),
+    name: text('name'),
+    description: text('description'),
+    isActive: boolean('is_active').default(true).notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdIdx: index('api_keys_user_id_idx').on(table.userId),
+    keyIdx: index('api_keys_key_idx').on(table.key),
+  })
+);
+
+// API Usage table (daily tracking)
+export const apiUsage = pgTable(
+  'api_usage',
+  {
+    id: text('id').primaryKey(),
+    apiKeyId: text('api_key_id')
+      .notNull()
+      .references(() => apiKeys.id, { onDelete: 'cascade' }),
+    date: timestamp('date', { withTimezone: true }).notNull(),
+    endpoint: text('endpoint').notNull(),
+    method: text('method').notNull(),
+    statusCode: integer('status_code'),
+    responseTime: integer('response_time'),
+    cost: integer('cost').default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    apiKeyIdIdx: index('api_usage_api_key_id_idx').on(table.apiKeyId),
+    dateIdx: index('api_usage_date_idx').on(table.date),
+    endpointIdx: index('api_usage_endpoint_idx').on(table.endpoint),
+  })
+);
+
+// API Key relations
+export const apiPlansRelations = relations(apiPlans, ({ many }) => ({
+  apiKeys: many(apiKeys),
+}));
+
+export const apiKeysRelations = relations(apiKeys, ({ one, many }) => ({
+  user: one(users, {
+    fields: [apiKeys.userId],
+    references: [users.id],
+  }),
+  plan: one(apiPlans, {
+    fields: [apiKeys.planId],
+    references: [apiPlans.id],
+  }),
+  usage: many(apiUsage),
+}));
+
+export const apiUsageRelations = relations(apiUsage, ({ one }) => ({
+  apiKey: one(apiKeys, {
+    fields: [apiUsage.apiKeyId],
+    references: [apiKeys.id],
+  }),
+}));
+
+// Type exports for API
+export type ApiPlan = typeof apiPlans.$inferSelect;
+export type NewApiPlan = typeof apiPlans.$inferInsert;
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type NewApiKey = typeof apiKeys.$inferInsert;
+export type ApiUsageRecord = typeof apiUsage.$inferSelect;
+export type NewApiUsageRecord = typeof apiUsage.$inferInsert;
+

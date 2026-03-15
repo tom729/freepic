@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { images, imageEmbeddings, users } from '@/lib/schema';
 import { uploadImage } from '@/lib/cos';
-import { processImage } from '@/lib/image-processing';
 import { verifyAuthWithUser } from '@/lib/server-auth';
 import { generateImageEmbedding, cosineSimilarity, deserializeEmbedding } from '@/lib/embedding';
 import { eq } from 'drizzle-orm';
@@ -509,9 +508,11 @@ async function processImageAsync(
       return;
     }
 
-    // 3. 生成 BlurHash 和 Dominant Color
-    const { blurHash, dominantColor } = await processImage(buffer);
-    console.log(`[Upload] Generated blurHash for image ${imageId}`);
+    // 3. 生成 BlurHash 和 Dominant Color（跳过以避免OOM）
+    // 可以后续按需生成
+    const blurHash = null;
+    const dominantColor = null;
+    console.log(`[Upload] Skipped blurHash generation to avoid OOM for image ${imageId}`);
 
     // 4. 上传文件到 COS（演示模式或 COS）
     let uploadResult;

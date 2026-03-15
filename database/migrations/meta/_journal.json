@@ -71,6 +71,13 @@
       "when": 1773290277681,
       "tag": "0009_complex_omega_red",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773535354378,
+      "tag": "0010_loose_phantom_reporter",
+      "breakpoints": true
     }
   ]
 }

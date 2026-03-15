@@ -14,6 +14,7 @@ import {
   Twitter,
   Globe,
   Upload,
+  Key,
 } from 'lucide-react';
 import { AvatarUpload } from '@/components/AvatarUpload';
 import { useSession, signOut } from 'next-auth/react';
@@ -297,6 +298,13 @@ export default function ProfilePage() {
                   <Download className="h-4 w-4" />
                   <span className="text-sm font-medium">{stats.totalDownloads} 次下载</span>
                 </div>
+                <a
+                  href="/profile/api-keys"
+                  className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700"
+                >
+                  <Key className="h-4 w-4" />
+                  <span className="text-sm font-medium">API Keys</span>
+                </a>
               </div>
             </div>
 
