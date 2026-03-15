@@ -8,31 +8,45 @@ import { verifyAuthWithUser } from '@/lib/server-auth';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/next-auth';
 
+// 验证管理员权限（支持 Bearer token 和 NextAuth session）
+async function verifyAdmin(request: NextRequest) {
+  // 先尝试 Bearer token
+  const { isAuthenticated, user } = await verifyAuthWithUser(request);
+  if (isAuthenticated && user?.isAdmin) {
+    return { isAdmin: true, user };
+  }
+
+  // 尝试 NextAuth session
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.email, session.user.email!),
+    });
+    if (dbUser?.isAdmin) {
+      return { isAdmin: true, user: dbUser };
+    }
+  }
+
+  if (!isAuthenticated && !session) {
+    return { isAdmin: false, error: '请先登录', status: 401 };
+  }
+
+  return { isAdmin: false, error: '无管理员权限', status: 403 };
+}
+
 /**
  * GET /api/admin/analytics - 获取平台统计数据
  */
 export async function GET(request: NextRequest) {
   try {
-    // 验证管理员权限 - 支持多种认证方式
-    const auth = await verifyAuthWithUser(request);
-    
-    // 如果 Bearer token 认证失败，尝试 NextAuth session
-    if (!auth.isAuthenticated || !auth.user?.isAdmin) {
-      const session = await getServerSession(authOptions);
-      if (session?.user?.email) {
-        const currentUser = await db.query.users.findFirst({
-          where: eq(users.email, session.user.email),
-        });
-        if (currentUser?.isAdmin) {
-          // Session 认证成功，继续执行
-        } else {
-          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-      } else {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    // 验证管理员权限
+    const adminCheck = await verifyAdmin(request);
+    if (!adminCheck.isAdmin) {
+      return NextResponse.json(
+        { error: adminCheck.error },
+        { status: adminCheck.status }
+      );
     }
-    // 获取总数统计
     const [totalImagesResult] = await db
       .select({ count: sql<number>`count(*)` })
       .from(images)
