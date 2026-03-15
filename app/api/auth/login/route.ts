@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { comparePassword } from '@/lib/password';
 import { SignJWT } from 'jose';
 import { checkRateLimit, getClientIp, AUTH_RATE_LIMITS } from '@/lib/rate-limit';
+import { ApiErrors, ErrorCodes } from '@/lib/api-response';
 export const dynamic = 'force-dynamic';
 
 // JWT Secret - must be set in environment
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Too many login attempts. Please try again later.',
+          code: ErrorCodes.RATE_LIMIT_EXCEEDED,
           retryAfter: rateLimitResult.retryAfter,
         },
         { 
