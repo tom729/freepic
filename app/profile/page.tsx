@@ -15,6 +15,8 @@ import {
   Globe,
   Upload,
   Key,
+  Shield,
+  BarChart3,
 } from 'lucide-react';
 import { AvatarUpload } from '@/components/AvatarUpload';
 import { useSession, signOut } from 'next-auth/react';
@@ -305,6 +307,24 @@ export default function ProfilePage() {
                   <Key className="h-4 w-4" />
                   <span className="text-sm font-medium">API Keys</span>
                 </a>
+                {user?.isAdmin && (
+                  <>
+                    <a
+                      href="/admin/moderation"
+                      className="flex items-center gap-1.5 text-orange-600 hover:text-orange-700"
+                    >
+                      <Shield className="h-4 w-4" />
+                      <span className="text-sm font-medium">内容审核</span>
+                    </a>
+                    <a
+                      href="/admin/analytics"
+                      className="flex items-center gap-1.5 text-green-600 hover:text-green-700"
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      <span className="text-sm font-medium">数据统计</span>
+                    </a>
+                  </>
+                )}
               </div>
             </div>
 

@@ -41,7 +41,7 @@ export default function ApiKeysPage() {
 
   const fetchKeys = async () => {
     try {
-      const res = await fetch('/api/keys');
+      const res = await fetch('/api/keys', { credentials: 'include' });
       if (res.status === 401) {
         router.push('/login');
         return;
@@ -60,6 +60,7 @@ export default function ApiKeysPage() {
     try {
       const res = await fetch('/api/keys', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newKeyName,
@@ -88,6 +89,7 @@ export default function ApiKeysPage() {
     try {
       const res = await fetch(`/api/keys/${keyId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       if (res.ok) {

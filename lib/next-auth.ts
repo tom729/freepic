@@ -13,6 +13,7 @@ declare module 'next-auth' {
       email: string;
       name: string;
       image: string;
+      isAdmin?: boolean;
     };
   }
 
@@ -27,6 +28,7 @@ declare module 'next-auth/jwt' {
     email?: string;
     name?: string;
     picture?: string;
+    isAdmin?: boolean;
   }
 }
 
@@ -102,6 +104,15 @@ export const authOptions: NextAuthOptions = {
         token.name = user.name || '';
         token.picture = user.image || '';
       }
+      // Fetch isAdmin from database
+      if (token.id) {
+        const dbUser = await db.query.users.findFirst({
+          where: eq(users.id, token.id),
+        });
+        if (dbUser) {
+          token.isAdmin = dbUser.isAdmin;
+        }
+      }
       return token;
     },
     async session({ session, token }) {
@@ -110,6 +121,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email || '';
         session.user.name = token.name || '';
         session.user.image = token.picture || '';
+        session.user.isAdmin = token.isAdmin || false;
       }
       return session;
     },
