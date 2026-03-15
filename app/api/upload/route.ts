@@ -462,7 +462,8 @@ export async function POST(request: NextRequest) {
         dominantColor: null, // 将在后台处理完成后更新
         description: description || null,
         location: null, // 将在后台处理完成后更新
-        status: 'pending', // 初始状态为 pending
+        // 管理员上传直接批准，普通用户需要审核
+        status: user.isAdmin ? 'approved' : 'pending',
         createdAt: new Date(),
       });
     // 立即返回成功响应
@@ -470,8 +471,8 @@ export async function POST(request: NextRequest) {
       success: true,
       image: {
         id: imageId,
-        status: 'pending',
-        message: '图片已接收，正在后台处理中',
+        status: user.isAdmin ? 'approved' : 'pending',
+        message: user.isAdmin ? '图片已接收，正在后台处理中' : '图片已接收，等待审核',
       },
     });
 
