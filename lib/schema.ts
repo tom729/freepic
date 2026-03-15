@@ -252,7 +252,8 @@ export const featuredCollectionImages = pgTable(
   })
 );
 
-// Comments table
+// Comments table - any type required for self-referencing foreign key
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const comments: any = pgTable(
   'comments',
   {

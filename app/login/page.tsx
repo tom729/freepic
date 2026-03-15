@@ -7,7 +7,8 @@ import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 
 // Dynamic import for NextAuth to avoid SSR issues
-let nextAuth: any = null;
+type NextAuthModule = typeof import('next-auth/react');
+let nextAuth: NextAuthModule | null = null;
 if (typeof window !== 'undefined') {
   import('next-auth/react').then((mod) => {
     nextAuth = mod;
@@ -28,6 +29,7 @@ export default function LoginPage() {
     if (typeof window === 'undefined' || !nextAuth) return;
     
     const checkSession = async () => {
+      if (!nextAuth) return;
       try {
         const { useSession } = nextAuth;
         const { data: session, status } = useSession();

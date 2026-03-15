@@ -15,7 +15,11 @@ function hashIp(ip: string): string {
 
 // Generate session ID from IP + User Agent (for anonymous tracking)
 function generateSessionId(ip: string, userAgent: string): string {
-  const data = `${ip}:${userAgent}:${process.env.JWT_SECRET || 'secret'}`;
+  const secret = process.env.JWT_SECRET || 'default-session-secret';
+  if (!process.env.JWT_SECRET) {
+    console.error('[SECURITY] JWT_SECRET not set for session generation');
+  }
+  const data = `${ip}:${userAgent}:${secret}`;
   return crypto.createHash('sha256').update(data).digest('hex').substring(0, 32);
 }
 

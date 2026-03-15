@@ -36,16 +36,32 @@ export async function GET(request: NextRequest) {
         userId: images.userId,
         cosKey: images.cosKey,
         // 标记匹配类型
-        matchType: sql`'keyword'`.as('match_type'),
+        matchType: sql<string>`'keyword'`.as('match_type'),
       })
       .from(images)
       .where(
         sql`${images.status} = 'approved' AND (${images.description} ILIKE ${'%' + query + '%'})`
       )
-      .limit(limit);
+      .limit(limit) as any;
 
     // 2. 如果有嵌入模型，做语义搜索
-    let semanticResults: any[] = [];
+    interface BaseImageResult {
+      id: string;
+      description: string | null;
+      width: number | null;
+      height: number | null;
+      blurHash: string | null;
+      dominantColor: string | null;
+      likes: number | null;
+      downloads: number | null;
+      createdAt: Date | null;
+      userId: string | null;
+      cosKey: string;
+      matchType?: string;
+      similarity?: number;
+    }
+    type SemanticResult = BaseImageResult & { similarity: number };
+    let semanticResults: SemanticResult[] = [];
     try {
       const queryEmbedding = await generateTextEmbedding(query);
 
@@ -72,7 +88,7 @@ export async function GET(request: NextRequest) {
         const imageIds = scored.map((s) => s.imageId);
         const imageIdToScore = new Map(scored.map((s) => [s.imageId, s.similarity]));
 
-        semanticResults = await db
+        const queryResults = await db
           .select({
             id: images.id,
             description: images.description,
@@ -90,7 +106,7 @@ export async function GET(request: NextRequest) {
           .where(sql`${images.id} IN ${imageIds} AND ${images.status} = 'approved'`);
         
         // 添加相似度分数
-        semanticResults = semanticResults.map(img => ({
+        semanticResults = queryResults.map(img => ({
           ...img,
           similarity: imageIdToScore.get(img.id) || 0
         }));
@@ -100,7 +116,21 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. 合并结果，去重，优先显示语义相似度高的
-    const allResults = [...keywordResults];
+    const allResults: Array<{
+      id: string;
+      description: string | null;
+      width: number | null;
+      height: number | null;
+      blurHash: string | null;
+      dominantColor: string | null;
+      likes: number | null;
+      downloads: number | null;
+      createdAt: Date | null;
+      userId: string | null;
+      cosKey: string;
+      matchType?: string;
+      similarity?: number;
+    }> = [...keywordResults];
     semanticResults.forEach((img) => {
       if (!allResults.find((r) => r.id === img.id)) {
         allResults.push({ ...img, matchType: 'semantic' });

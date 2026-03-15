@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
@@ -7,12 +6,16 @@ import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
-// 腾讯云内容安全 SDK
-let CmsClient: any;
+// 腾讯云内容安全 SDK 类型定义
+interface TencentCmsClient {
+  ImageModeration(request: unknown): Promise<unknown>;
+}
+
+let CmsClient: new (config: { credential: { secretId: string; secretKey: string }; region: string; profile: unknown }) => TencentCmsClient;
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const tencentcloud = require('tencentcloud-sdk-nodejs');
-  const cmsClient = tencentcloud.cms.v20190321.Client;
-  CmsClient = cmsClient;
+  CmsClient = tencentcloud.cms.v20190321.Client;
 } catch {
   console.warn('腾讯云 CMS SDK 未安装');
 }

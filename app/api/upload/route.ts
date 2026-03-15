@@ -393,6 +393,39 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    // Security: Validate magic bytes to ensure file content matches extension
+    const MAGIC_BYTES: Record<string, { bytes: number[], mime: string }> = {
+      jpeg: { bytes: [0xFF, 0xD8, 0xFF], mime: 'image/jpeg' },
+      png: { bytes: [0x89, 0x50, 0x4E, 0x47], mime: 'image/png' },
+      gif: { bytes: [0x47, 0x49, 0x46, 0x38], mime: 'image/gif' },
+      webp: { bytes: [0x52, 0x49, 0x46, 0x46], mime: 'image/webp' }, // RIFF followed by WEBP
+    };
+
+    let isValidImage = false;
+    for (const [format, info] of Object.entries(MAGIC_BYTES)) {
+      const header = buffer.slice(0, info.bytes.length);
+      const matches = info.bytes.every((byte, i) => header[i] === byte);
+      if (matches) {
+        // For WebP, need to check further
+        if (format === 'webp') {
+          const webpHeader = buffer.slice(8, 12).toString('ascii');
+          if (webpHeader === 'WEBP') {
+            isValidImage = true;
+            break;
+          }
+        } else {
+          isValidImage = true;
+          break;
+        }
+      }
+    }
+
+    if (!isValidImage) {
+      return NextResponse.json(
+        { error: 'Invalid image file. File content does not match image format.' },
+        { status: 400 }
+      );
+    }
     // 计算文件 MD5 哈希（用于快速重复检测）
     const fileHash = calculateFileHash(buffer);
     console.log(`[Upload] File hash: ${fileHash}`);
