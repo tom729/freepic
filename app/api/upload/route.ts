@@ -430,29 +430,27 @@ export async function POST(request: NextRequest) {
     const fileHash = calculateFileHash(buffer);
     console.log(`[Upload] File hash: ${fileHash}`);
 
-    // 跳过重复检测以加快上传速度
-    // const hashCheck = await checkDuplicateByHash(userId, fileHash);
-    // if (hashCheck.isDuplicate) {
-    //   return NextResponse.json(
-    //     {
-    //       error: '文件已存在',
-    //       details: '您已经上传过完全相同的文件',
-    //       existingImage: hashCheck.existingImage,
-    //     },
-    //     { status: 409 } // Conflict
-    //   );
-    // }
-
     // 生成图片ID
     const imageId = uuidv4();
 
-    // 先保存到数据库，状态为 pending，EXIF数据留空，等待后台处理
+    // 立即上传到 COS（同步操作）
+    let uploadResult;
+    const filename = `upload_${Date.now()}_${file.name}`;
+    if (isDemoMode) {
+      console.log('[DEMO MODE] Uploading to local storage...');
+      uploadResult = await demoUpload(buffer, userId, filename);
+    } else {
+      uploadResult = await uploadImage(buffer, filename, file.type, userId);
+    }
+    console.log(`[Upload] File uploaded to ${uploadResult.key}`);
+
+    // 先保存到数据库，cosKey 已填充
     await db
       .insert(images)
       .values({
         id: imageId,
         userId,
-        cosKey: '', // 将在后台处理完成后更新
+        cosKey: uploadResult.key, // 已经上传完成，cosKey 已知
         exifData: {}, // 空对象，等待后台处理填充
         width: null,
         height: null,
@@ -466,18 +464,20 @@ export async function POST(request: NextRequest) {
         status: user.isAdmin ? 'approved' : 'pending',
         createdAt: new Date(),
       });
-    // 立即返回成功响应
+
+    // 返回成功响应，包含图片 URL
     const response = NextResponse.json({
       success: true,
       image: {
         id: imageId,
         status: user.isAdmin ? 'approved' : 'pending',
-        message: user.isAdmin ? '图片已接收，正在后台处理中' : '图片已接收，等待审核',
+        url: uploadResult.url,
+        message: user.isAdmin ? '上传成功' : '图片已接收，等待审核',
       },
     });
 
-    // 触发后台处理（不等待完成）
-    processImageAsync(imageId, buffer, file.name, file.type, userId).catch((err) => {
+    // 后台处理：提取 EXIF 等（不阻塞响应）
+    processImageAsync(imageId, buffer, file.name, file.type, userId, uploadResult.key, uploadResult.url).catch((err) => {
       console.error('[Upload] Background processing failed:', err);
     });
 
@@ -511,13 +511,15 @@ async function triggerModeration(imageId: string, imageUrl: string) {
   }
 }
 
-// 后台异步处理图片：提取EXIF、验证、生成BlurHash、上传到COS、触发审核
+// 后台异步处理图片：提取EXIF、更新元数据
 async function processImageAsync(
   imageId: string,
   buffer: Buffer,
   filename: string,
   mimeType: string,
-  userId: string
+  userId: string,
+  cosKey: string,
+  imageUrl: string
 ) {
   try {
     console.log(`[Upload] Starting background processing for image ${imageId}`);
@@ -548,21 +550,10 @@ async function processImageAsync(
     const dominantColor = null;
     console.log(`[Upload] Skipped blurHash generation to avoid OOM for image ${imageId}`);
 
-    // 4. 上传文件到 COS（演示模式或 COS）
-    let uploadResult;
-    if (isDemoMode) {
-      console.log('[DEMO MODE] Uploading to local storage...');
-      uploadResult = await demoUpload(buffer, userId, filename);
-    } else {
-      uploadResult = await uploadImage(buffer, filename, mimeType, userId);
-    }
-    console.log(`[Upload] File uploaded to ${uploadResult.key}`);
-
-    // 5. 更新数据库记录
+    // 4. 更新数据库记录（EXIF 和尺寸）
     await db
       .update(images)
       .set({
-        cosKey: uploadResult.key,
         exifData: {
           camera: exifData.camera,
           cameraMake: exifData.cameraMake,
@@ -578,20 +569,18 @@ async function processImageAsync(
         blurHash,
         dominantColor,
         location: exifData.gps?.formatted || null,
-        status: 'approved',
       })
       .where(eq(images.id, imageId));
     console.log(`[Upload] Database updated for image ${imageId}`);
 
-    // 6. 触发内容审核
-    triggerModeration(imageId, uploadResult.url).catch((err) => {
+    // 5. 触发内容审核
+    triggerModeration(imageId, imageUrl).catch((err) => {
       console.error('[Upload] Moderation trigger failed:', err);
     });
 
-    // 7. 生成语义搜索 embedding（不等待结果）
+    // 6. 生成语义搜索 embedding（不等待结果）
     try {
-      // 传递 cosKey，让 embedding 队列生成自己的长期 URL
-      queueEmbeddingGeneration(imageId, uploadResult.key);
+      queueEmbeddingGeneration(imageId, cosKey);
       console.log(`[Upload] Queued embedding generation for image ${imageId}`);
     } catch (err) {
       console.error('[Upload] Failed to queue embedding:', err);
