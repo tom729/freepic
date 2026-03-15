@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { images, users, downloads, imageViews } from '@/lib/schema';
 import { eq, sql, desc, gte, and } from 'drizzle-orm';
+import { verifyAuthWithUser } from '@/lib/server-auth';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/next-auth';
 
@@ -12,20 +13,25 @@ import { authOptions } from '@/lib/next-auth';
  */
 export async function GET(request: NextRequest) {
   try {
-    // 验证管理员权限
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 验证管理员权限 - 支持多种认证方式
+    const auth = await verifyAuthWithUser(request);
+    
+    // 如果 Bearer token 认证失败，尝试 NextAuth session
+    if (!auth.isAuthenticated || !auth.user?.isAdmin) {
+      const session = await getServerSession(authOptions);
+      if (session?.user?.email) {
+        const currentUser = await db.query.users.findFirst({
+          where: eq(users.email, session.user.email),
+        });
+        if (currentUser?.isAdmin) {
+          // Session 认证成功，继续执行
+        } else {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+      } else {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
-
-    const currentUser = await db.query.users.findFirst({
-      where: eq(users.email, session.user.email),
-    });
-
-    if (!currentUser?.isAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     // 获取总数统计
     const [totalImagesResult] = await db
       .select({ count: sql<number>`count(*)` })
