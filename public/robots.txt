@@ -103,4 +103,4 @@ Allow: /about
 # ============================================
 # Sitemap Location
 # ============================================
-Sitemap: http://localhost:9000/sitemap.xml
+Sitemap: https://tuku.mepai.me/sitemap.xml

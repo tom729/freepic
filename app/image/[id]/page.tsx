@@ -1,3 +1,4 @@
+import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Download, Camera, Calendar, MapPin, Instagram, Twitter, Globe, Eye } from 'lucide-react';
@@ -83,6 +84,44 @@ const mockImageUrls: Record<string, string> = {
   'images/mock/tech-1.jpg': 'https://images.unsplash.com/photo-1518770660439-4636190af475',
   'images/mock/animal-1.jpg': 'https://images.unsplash.com/photo-1474511320723-9a56873571b7',
 };
+
+// Generate SEO metadata for image page
+export async function generateMetadata({ params }: ImagePageProps): Promise<Metadata> {
+  const { id } = params;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9000';
+  
+  try {
+    const image = await db.query.images.findFirst({
+      where: eq(images.id, id),
+    });
+    
+    if (!image || image.status !== 'approved') {
+      return { title: '图片未找到' };
+    }
+    
+    const imageUrl = image.cosKey?.startsWith('uploads/')
+      ? `${baseUrl}/${image.cosKey}`
+      : `https://tukupic.mepai.me/${image.cosKey}/regular`;
+    
+    return {
+      title: `${image.description || '精美图片'} - FreePic`,
+      description: image.description || '高质量图片，可免费下载使用',
+      openGraph: {
+        type: 'article',
+        url: `${baseUrl}/image/${id}`,
+        title: image.description || '精美图片',
+        images: [{ url: imageUrl, width: 1200, height: 630 }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: image.description || '精美图片',
+        images: [imageUrl],
+      },
+    };
+  } catch {
+    return { title: '图片详情' };
+  }
+}
 
 interface ImagePageProps {
   params: {

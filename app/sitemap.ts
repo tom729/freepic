@@ -66,6 +66,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       },
       ...imagePages,
       ...userPages,
+      
+      // Tags pages
+      {
+        url: `${baseUrl}/tags`,
+        lastModified: new Date(),
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      },
+      
+      // Collections pages
+      {
+        url: `${baseUrl}/collections`,
+        lastModified: new Date(),
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      },
+      
+      // License page
+      {
+        url: `${baseUrl}/license`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.5,
+      },
+      
+      // About page
+      {
+        url: `${baseUrl}/about`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.5,
+      },
     ];
   } catch (error) {
     console.error('[Sitemap] Database query failed, returning static sitemap:', error);
