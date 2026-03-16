@@ -22,6 +22,8 @@ export interface ImageItem {
   blurHash?: string;
   dominantColor?: string;
   status?: 'pending' | 'approved' | 'rejected';
+  // SEO fields
+  description?: string;
 }
 
 interface ImageCardProps {
@@ -138,7 +140,7 @@ export function ImageCard({ image, onClick, onDelete, priority = false }: ImageC
           {isExternalImage ? (
             <Image
               src={displayUrl}
-              alt={`Photo by ${image.author}`}
+              alt={image.description || `Photo by ${image.author}`}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 33vw"
               className={`object-cover transition-all duration-700 ease-out ${
@@ -156,7 +158,7 @@ export function ImageCard({ image, onClick, onDelete, priority = false }: ImageC
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={displayUrl}
-              alt={`Photo by ${image.author}`}
+              alt={image.description || `Photo by ${image.author}`}
               className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ease-out ${
                 isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
               } group-hover:scale-105`}

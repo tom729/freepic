@@ -12,7 +12,7 @@ import { DownloadButtons } from '@/components/DownloadButtons';
 import { getImageUrl } from '@/lib/cos';
 import { ViewCountDisplay } from '@/components/ViewCounter';
 import { CommentSection } from '@/components/CommentSection';
-
+import { Breadcrumb } from '@/components/Breadcrumb';
 // Client components wrapper
 import { AddToCollectionButtonWrapper } from '@/components/AddToCollectionButtonWrapper';
 
@@ -247,6 +247,12 @@ export default async function ImagePage({ params }: ImagePageProps) {
       />
       <div className="min-h-screen bg-gray-50 pt-2 sm:pt-4">
         <div className="mx-auto max-w-7xl px-3 sm:px-4 py-4 sm:py-8">
+          <Breadcrumb
+            items={[
+              { label: '首页', href: '/' },
+              { label: '图片详情' }
+            ]}
+          />
           <div className="grid grid-cols-1 gap-4 sm:gap-8 lg:grid-cols-3">
             {/* Main Image */}
             <div className="lg:col-span-2">
